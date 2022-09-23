@@ -1,9 +1,9 @@
 #FROM ubuntu:bionic
 FROM ubuntu:20.04
 
-ARG PYTHON_VERSION=3.7
+ARG PYTHON_VERSION=3.8
 
-LABEL maintainer="jiri.borovec@fel.cvut.cz"
+LABEL maintainer="arthurelsk@gmail.com"
 
 SHELL ["/bin/bash", "-c"]
 
@@ -59,7 +59,7 @@ RUN \
     # https://imagej.nih.gov/ij/docs/guide/146-18.html
     Fiji.app/ImageJ-linux64 -eval "return getVersion();"
 
-ENV ANTs_VERSION="2.3.4"
+ENV ANTs_VERSION="2.4.1"
 
 RUN \
     apt-get update -qq && \
@@ -215,6 +215,9 @@ RUN \
         libxml2-dev \
         libssl-dev \
         libgit2-dev \
+	    libfontconfig1-dev \
+        libharfbuzz-dev \
+        libfribidi-dev \
     && \
 # install RNiftyReg
     R -e 'install.packages(c("png", "jpeg", "OpenImageR", "devtools"))' && \
