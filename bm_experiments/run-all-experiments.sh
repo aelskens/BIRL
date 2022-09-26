@@ -3,17 +3,19 @@
 export DISPLAY=""
 # DEFINE GLOBAL PARAMS
 jobs=3
-table="~/Medical-data/dataset_ANHIR/images/dataset_medium.csv"
+table="/io/inputs/dataset_ANHIR/dataset_medium.csv"
 # this folder has to contain bland of images and landmarks
-dataset="~/Medical-data/microscopy/TEMPORARY/borovec/dataset_ANHIR/images"
-results="~/Medical-data/microscopy/TEMPORARY/borovec/experiments_ANHIR/"
-apps="~/Applications"
+dataset="/io/inputs/dataset_ANHIR/images"
+results="/io/outputs/dataset_ANHIR/"
+apps="/Applications"
 
-preprocessings=("" \
-                "--preprocessing gray" \
-                "--preprocessing matching-rgb" \
-                "--preprocessing gray matching-rgb" \
-                "--preprocessing matching-rgb gray")
+# preprocessings=("" \
+#                 "--preprocessing gray" \
+#                 "--preprocessing matching-rgb" \
+#                 "--preprocessing gray matching-rgb" \
+#                 "--preprocessing matching-rgb gray")
+
+preprocessings=("")
 
 for pproc in "${preprocessings[@]}"
 do
@@ -23,7 +25,7 @@ do
          -d $dataset \
          -o $results \
          --run_comp_benchmark \
-         -ANTs "$apps/antsbin/bin" \
+         -ANTs "$apps/ANTs-regist" \
          -cfg ./configs/ANTs_SyN.txt \
          "$pproc" \
          --visual --unique --nb_workers $jobs
@@ -83,7 +85,7 @@ do
          -d $dataset \
          -o $results \
          --run_comp_benchmark \
-         -R "$apps/R-3.5.3/bin/Rscript" \
+         -R Rscript \
          -script ./scripts/Rscript/RNiftyReg_linear.r \
          "$pproc" \
          --visual --unique --nb_workers $jobs
