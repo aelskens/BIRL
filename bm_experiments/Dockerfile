@@ -340,3 +340,5 @@ RUN \
 
 RUN \
     mkdir results
+
+WORKDIR /BIRL
