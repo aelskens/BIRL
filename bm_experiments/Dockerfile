@@ -59,7 +59,7 @@ RUN \
     # https://imagej.nih.gov/ij/docs/guide/146-18.html
     Fiji.app/ImageJ-linux64 -eval "return getVersion();"
 
-ENV ANTs_VERSION="2.4.1"
+ENV ANTs_VERSION="2.3.4"
 
 RUN \
     apt-get update -qq && \
@@ -81,6 +81,7 @@ RUN \
         -D BUILD_TESTING=OFF \
         -D RUN_SHORT_TESTS=OFF \
         -D RUN_LONG_TESTS=OFF \
+        -D SuperBuild_ANTS_USE_GIT_PROTOCOL=OFF \
     && \
     make -j$(nproc) ANTS && \
 # remove source folder
@@ -336,3 +337,6 @@ RUN \
     && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+RUN \
+    mkdir results

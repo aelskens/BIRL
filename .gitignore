@@ -37,3 +37,6 @@ coverage.xml
 
 # Raw illustrations
 figures/*.png
+
+# macOS
+**/.DS_store
