@@ -339,6 +339,6 @@ RUN \
     rm -rf /var/lib/apt/lists/*
 
 RUN \
-    mkdir results
+    mkdir io
 
 WORKDIR /BIRL
