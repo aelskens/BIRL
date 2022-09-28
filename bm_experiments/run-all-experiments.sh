@@ -3,19 +3,16 @@
 export DISPLAY=""
 # DEFINE GLOBAL PARAMS
 jobs=3
-table="/io/inputs/dataset_ANHIR/dataset_medium.csv"
+table="/BIRL/io/inputs/dataset_ANHIR/dataset_medium.csv"
 # this folder has to contain bland of images and landmarks
-dataset="/io/inputs/dataset_ANHIR/images"
-results="/io/outputs/dataset_ANHIR/"
-apps="/Applications"
+dataset="/BIRL/io/inputs/dataset_ANHIR/images"
+results="/BIRL/io/outputs/dataset_ANHIR/"
+apps="/BIRL/Applications"
 
-# preprocessings=("" \
-#                 "--preprocessing gray" \
-#                 "--preprocessing matching-rgb" \
-#                 "--preprocessing gray matching-rgb" \
-#                 "--preprocessing matching-rgb gray")
-
-preprocessings=("")
+preprocessings=("gray" \
+                "matching-rgb" \
+                "gray matching-rgb" \
+                "matching-rgb gray")
 
 for pproc in "${preprocessings[@]}"
 do
@@ -27,7 +24,7 @@ do
          --run_comp_benchmark \
          -ANTs "$apps/ANTs-regist" \
          -cfg ./configs/ANTs_SyN.txt \
-         "$pproc" \
+         -pproc $pproc \
          --visual --unique --nb_workers $jobs
 
     python bm_experiments/bm_ANTsPy.py \
@@ -37,7 +34,7 @@ do
          --run_comp_benchmark \
          -py python3 \
          -script ./scripts/Python/run_ANTsPy.py \
-         "$pproc" \
+         -pproc $pproc \
          --visual --unique --nb_workers $jobs
 
     python bm_experiments/bm_bUnwarpJ.py \
@@ -47,7 +44,7 @@ do
          --run_comp_benchmark \
          -Fiji "$apps/Fiji.app/ImageJ-linux64" \
          -cfg ./configs/ImageJ_bUnwarpJ_histol.yaml \
-         "$pproc" \
+         -pproc $pproc \
          --visual --unique --nb_workers $jobs
 
     python bm_experiments/bm_bUnwarpJ.py \
@@ -57,7 +54,7 @@ do
          --run_comp_benchmark \
          -Fiji "$apps/Fiji.app/ImageJ-linux64" \
          -cfg ./configs/ImageJ_bUnwarpJ-SIFT_histol.yaml \
-         "$pproc" \
+         -pproc $pproc \
          --visual --unique --nb_workers $jobs
 
     python bm_experiments/bm_DROP2.py \
@@ -67,7 +64,7 @@ do
          --run_comp_benchmark \
          -DROP "$apps/DROP2/dropreg" \
          -cfg ./configs/DROP2.txt \
-         "$pproc" \
+         -pproc $pproc \
          --visual --unique --nb_workers $jobs
 
     python bm_experiments/bm_elastix.py \
@@ -77,7 +74,7 @@ do
          --run_comp_benchmark \
          -elastix "$apps/elastix/bin" \
          -cfg ./configs/elastix_bspline.txt \
-         "$pproc" \
+         -pproc $pproc \
          --visual --unique --nb_workers $jobs
 
     python bm_experiments/bm_rNiftyReg.py \
@@ -87,7 +84,7 @@ do
          --run_comp_benchmark \
          -R Rscript \
          -script ./scripts/Rscript/RNiftyReg_linear.r \
-         "$pproc" \
+         -pproc $pproc \
          --visual --unique --nb_workers $jobs
 
     python bm_experiments/bm_RVSS.py \
@@ -97,7 +94,7 @@ do
          --run_comp_benchmark \
          -Fiji "$apps/Fiji.app/ImageJ-linux64" \
          -cfg ./configs/ImageJ_RVSS_histol.yaml \
-         "$pproc" \
+         -pproc $pproc \
          --visual --unique --nb_workers $jobs
 
 done

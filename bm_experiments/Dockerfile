@@ -338,7 +338,4 @@ RUN \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-RUN \
-    mkdir io
-
 WORKDIR /BIRL
