@@ -405,6 +405,11 @@ class ImRegBenchmark(Experiment):
                 #  problem is in calling class method inside the pool which is ot static
                 for path_img, col in iterate_mproc_map(__convert_gray, argv_params, nb_workers=1, desc=None):
                     item[col + self.COL_IMAGE_EXT_TEMP] = path_img
+            elif pproc.startswith('deconvolution'):
+                color_channel = pproc.split('-')[-1]
+                argv_params = [(path_img_ref, color_channel), (path_img_move, color_channel)]
+                for path_img, col in iterate_mproc_map(deconv_he, argv_params, nb_workers=1, desc=None):
+                    item[col + self.COL_IMAGE_EXT_TEMP] = path_img
             else:
                 logging.warning('unrecognized pre-processing: %s', pproc)
         return item
