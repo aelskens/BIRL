@@ -28,7 +28,7 @@ from skimage.color import rgb2gray
 # this is used while calling this file as a script
 sys.path += [os.path.abspath('.'), os.path.abspath('..')]  # Add path to root
 from birl.utilities.data_io import create_folder, image_sizes, load_image, load_landmarks, save_image, update_path
-from birl.utilities.dataset import common_landmarks, image_histogram_matching
+from birl.utilities.dataset import common_landmarks, image_histogram_matching, deconv_he
 from birl.utilities.drawing import draw_image_points, draw_images_warped_landmarks, export_figure, overlap_two_images
 from birl.utilities.evaluate import (
     compute_affine_transf_diff,
@@ -387,6 +387,13 @@ class ImRegBenchmark(Experiment):
             __save_img(col, path_img_new, rgb2gray(load_image(path_img)))
             return self._relativize_path(path_img_new, destination='path_exp'), col
 
+        def __deconv_he(path_img_pproc_col):
+            path_img, pproc, col = path_img_pproc_col
+            path_img_new = __path_img(path_img, pproc)
+            stain = pproc.split('-')[-1]
+            __save_img(col, path_img_new, deconv_he(load_image(path_img), stain))
+            return self._relativize_path(path_img_new, destination='path_exp'), col
+
         for pproc in self.params.get('preprocessing', []):
             path_img_ref, path_img_move, _, _ = self._get_paths(item, prefer_pproc=True)
             if pproc.startswith('match'):
@@ -406,9 +413,8 @@ class ImRegBenchmark(Experiment):
                 for path_img, col in iterate_mproc_map(__convert_gray, argv_params, nb_workers=1, desc=None):
                     item[col + self.COL_IMAGE_EXT_TEMP] = path_img
             elif pproc.startswith('deconvolution'):
-                color_channel = pproc.split('-')[-1]
-                argv_params = [(path_img_ref, color_channel), (path_img_move, color_channel)]
-                for path_img, col in iterate_mproc_map(deconv_he, argv_params, nb_workers=1, desc=None):
+                argv_params = [(path_img_ref, pproc, self.COL_IMAGE_REF), (path_img_move, pproc, self.COL_IMAGE_MOVE)]
+                for path_img, col in iterate_mproc_map(__deconv_he, argv_params, nb_workers=1, desc=None):
                     item[col + self.COL_IMAGE_EXT_TEMP] = path_img
             else:
                 logging.warning('unrecognized pre-processing: %s', pproc)

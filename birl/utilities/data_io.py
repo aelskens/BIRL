@@ -297,10 +297,11 @@ def image_sizes(path_image, decimal=1):
 
 
 @io_image_decorate
-def load_image(path_image, force_rgb=True):
+def load_image(path_image, normalized=True, force_rgb=True):
     """ load the image in value range (0, 1)
 
     :param str path_image: path to the image
+    :param bool normalized: change the value range to (0, 1)
     :param bool force_rgb: convert RGB image
     :return ndarray: np.array<height, width, ch>
 
@@ -314,8 +315,9 @@ def load_image(path_image, force_rgb=True):
     if not os.path.isfile(path_image):
         raise FileNotFoundError('missing image "%s"' % path_image)
     image = np.array(Image.open(path_image))
-    while image.max() > 1.5:
-        image = image / 255.
+    if normalized:
+        while image.max() > 1.5:
+            image = image / 255.
     if force_rgb and (image.ndim == 2 or image.shape[2] == 1):
         image = image[:, :, 0] if image.ndim == 3 else image
         image = gray2rgb(image)

@@ -352,7 +352,7 @@ def create_basic_parser(name=''):
         required=False,
         nargs='+',
         help='use some image pre-processing, the other matter',
-        choices=['gray'] + ['matching-%s' % clr for clr in CONVERT_RGB]
+        choices=['gray'] + ['matching-%s' % clr for clr in CONVERT_RGB] + [f'deconvolution-{stain}' for stain in ['hem', 'eos']]
     )
     # parser.add_argument('--lock_expt', dest='lock_thread', action='store_true',
     #                     help='whether lock to run experiment in single thread')
