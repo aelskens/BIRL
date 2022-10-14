@@ -391,7 +391,7 @@ class ImRegBenchmark(Experiment):
             path_img, pproc, col = path_img_pproc_col
             path_img_new = __path_img(path_img, pproc)
             stain = pproc.split('-')[-1]
-            __save_img(col, path_img_new, deconv_he(load_image(path_img), stain))
+            __save_img(col, path_img_new, deconv_he(load_image(path_img, normalized=False), stain))
             return self._relativize_path(path_img_new, destination='path_exp'), col
 
         for pproc in self.params.get('preprocessing', []):
