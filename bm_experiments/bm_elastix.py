@@ -168,12 +168,12 @@ class BmElastix(ImRegBenchmark):
         :return dict: paths to warped images/landmarks
         """
         path_dir = self._get_path_reg_dir(item)
-        _, path_img_move, _, path_lnds_move = self._get_paths(item)
+        _, path_img_move, path_lnds_ref, _ = self._get_paths(item)
         path_img_warp, path_lnds_warp = None, None
         path_log = os.path.join(path_dir, self.NAME_LOG_REGISTRATION)
 
-        name_lnds = os.path.basename(path_lnds_move)
-        path_lnds_local = save_landmarks_pts(os.path.join(path_dir, name_lnds), load_landmarks(path_lnds_move))
+        name_lnds = os.path.basename(path_lnds_ref)
+        path_lnds_local = save_landmarks_pts(os.path.join(path_dir, name_lnds), load_landmarks(path_lnds_ref))
 
         # warping the image and points
         cmd = self.COMMAND_TRANSFORMATION % {
@@ -201,7 +201,7 @@ class BmElastix(ImRegBenchmark):
 
         return {
             self.COL_IMAGE_MOVE_WARP: path_img_warp,
-            self.COL_POINTS_MOVE_WARP: path_lnds_warp,
+            self.COL_POINTS_REF_WARP: path_lnds_warp,
         }
 
     def _clear_after_registration(self, item):
