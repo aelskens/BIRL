@@ -1008,13 +1008,13 @@ def deconv_he(img: np.array, stain: str, Io: int = 240, alpha: int = 1, beta: in
     
     # unmix hematoxylin or eosin
     if stain == 'hem':
-        out = np.multiply(Io, np.exp(np.expand_dims(-HERef[:,0], axis=1).dot(np.expand_dims(C2[0,:], axis=0))))
+        out = np.multiply(Io, C2[0,:])
     elif stain == 'eos':
-        out = np.multiply(Io, np.exp(np.expand_dims(-HERef[:,1], axis=1).dot(np.expand_dims(C2[1,:], axis=0))))
+        out = np.multiply(Io, C2[1,:])
     else:
         logging.warning(f'unrecognized stain: {stain}')
     
     out[out>255] = 254
-    out = np.reshape(out.T, (h, w, 3)).astype(np.uint8)
+    out = 255 - np.reshape(out, (h, w)).astype(np.uint8)
 
     return out
