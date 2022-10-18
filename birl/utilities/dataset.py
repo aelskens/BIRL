@@ -954,15 +954,11 @@ def deconv_he(img: np.array, stain: str, Io: int = 240, alpha: int = 1, beta: in
     Adaptation for this application of the code from https://github.com/schaugf/HEnorm_python
 
     """
-
-    HERef = np.array([[0.5626, 0.2159],
-                      [0.7201, 0.8012],
-                      [0.4062, 0.5581]])
         
     maxCRef = np.array([1.9705, 1.0308])
     
     # define height and width of image
-    h, w, c = img.shape
+    h, w, _c = img.shape
     
     # reshape image
     img = img.reshape((-1,3))
@@ -974,7 +970,7 @@ def deconv_he(img: np.array, stain: str, Io: int = 240, alpha: int = 1, beta: in
     ODhat = OD[~np.any(OD<beta, axis=1)]
         
     # compute eigenvectors
-    eigvals, eigvecs = np.linalg.eigh(np.cov(ODhat.T))
+    _eigvals, eigvecs = np.linalg.eigh(np.cov(ODhat.T))
     
     # project on the plane spanned by the eigenvectors corresponding to the two 
     # largest eigenvalues    
