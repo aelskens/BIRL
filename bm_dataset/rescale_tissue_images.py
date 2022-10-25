@@ -34,7 +34,6 @@ NB_WORKERS = get_nb_workers(0.5)
 DEFAULT_SCALES = (5, 10, 15, 20, 25, 50)
 IMAGE_EXTENSION = '.jpg'
 # IMWRITE_PARAMS = (cv.IMWRITE_JPEG_QUALITY, 100)
-FOLDER_TEMPLATE = 'scale-%ipc'
 
 
 def arg_parse_params():
@@ -44,7 +43,7 @@ def arg_parse_params():
     # SEE: https://docs.python.org/3/library/argparse.html
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--scales', type=int, required=False, nargs='+', help='list of output scales', default=DEFAULT_SCALES
+        '--scales', type=float, required=False, nargs='+', help='list of output scales', default=DEFAULT_SCALES
     )
     parser.add_argument(
         '-ext', '--image_extension', type=str, required=False, help='output image extension', default=IMAGE_EXTENSION
@@ -68,7 +67,7 @@ def scale_image(img_path, scale, image_ext=IMAGE_EXTENSION, overwrite=False):
     name, _ = os.path.splitext(os.path.basename(img_path))
     base_scale = parse_path_scale(os.path.dirname(img_path))
 
-    path_dir = os.path.join(base, FOLDER_TEMPLATE % scale)
+    path_dir = os.path.join(base, f"scale-{scale}pc")
     create_folder(path_dir)
 
     path_img_scale = os.path.join(path_dir, name + image_ext)
