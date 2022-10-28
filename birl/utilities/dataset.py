@@ -38,7 +38,7 @@ IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg')
 IMAGE_COMPRESSION_OPTIONS = (IMWRITE_JPEG_QUALITY, 98) + \
                             (IMWRITE_PNG_COMPRESSION, 9)
 #: template for detecting/parsing scale from folder name
-REEXP_FOLDER_SCALE = r'\S*scale-(\d+.?\d?)pc'
+REEXP_FOLDER_SCALE = r'scale-(\d+.?\d?)pc'
 # ERROR:root:error: Image size (... pixels) exceeds limit of ... pixels,
 # could be decompression bomb DOS attack.
 # SEE: https://gitlab.mister-muffin.de/josch/img2pdf/issues/42
@@ -292,11 +292,11 @@ def parse_path_scale(path_folder):
     obj = re.match(REEXP_FOLDER_SCALE, folder)
     if obj is None:
         return np.nan
-        
+
     try:
-        scale = int(obj.groups()[0])
+        scale = int(obj.group(1))
     except:
-        scale = float(obj.groups()[0])
+        scale = float(obj.group(1))
 
     return scale
 
