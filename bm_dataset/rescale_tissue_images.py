@@ -35,7 +35,6 @@ DEFAULT_SCALES = (5, 10, 15, 20, 25, 50)
 IMAGE_EXTENSION = '.jpg'
 # IMWRITE_PARAMS = (cv.IMWRITE_JPEG_QUALITY, 100)
 
-
 def arg_parse_params():
     """ parse the input parameters
     :return dict: parameters
@@ -67,7 +66,11 @@ def scale_image(img_path, scale, image_ext=IMAGE_EXTENSION, overwrite=False):
     name, _ = os.path.splitext(os.path.basename(img_path))
     base_scale = parse_path_scale(os.path.dirname(img_path))
 
-    path_dir = os.path.join(base, f"scale-{scale}pc")
+    try:
+        path_dir = os.path.join(base, f"scale-{scale:d}pc")
+    except:
+        path_dir = os.path.join(base, f"scale-{scale:.1f}pc")
+        
     create_folder(path_dir)
 
     path_img_scale = os.path.join(path_dir, name + image_ext)

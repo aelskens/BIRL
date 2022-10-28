@@ -43,7 +43,7 @@ from birl.utilities.data_io import create_folder, load_landmarks_csv, save_landm
 from birl.utilities.dataset import compute_bounding_polygon, inside_polygon, list_sub_folders, parse_path_scale
 from birl.utilities.experiments import is_iterable, iterate_mproc_map, parse_arg_params
 from birl.utilities.registration import estimate_affine_transform, transform_points
-from bm_dataset.rescale_tissue_images import DEFAULT_SCALES, FOLDER_TEMPLATE, NB_WORKERS
+from bm_dataset.rescale_tissue_images import DEFAULT_SCALES, NB_WORKERS
 
 
 def arg_parse_params():
@@ -57,7 +57,7 @@ def arg_parse_params():
     parser.add_argument('-d', '--path_dataset', type=str, required=False, help='path to the output directory - dataset')
     parser.add_argument(
         '--scales',
-        type=int,
+        type=float,
         required=False,
         nargs='*',
         help='generated scales for the dataset',
@@ -201,7 +201,7 @@ def extend_landmarks(path_set, path_dataset, nb_selected=None, nb_total=None):
         names_lnds_new = expand_random_warped_landmarks(names_lnds, names_lnds_new, nb_total)
 
     # export the landmarks
-    path_set_scale = os.path.join(path_dataset, os.path.basename(path_set), FOLDER_TEMPLATE % 100)
+    path_set_scale = os.path.join(path_dataset, os.path.basename(path_set), f"scale-{100}pc")
     create_folder(path_set_scale)
     for name, val in names_lnds_new.items():
         save_landmarks_csv(os.path.join(path_set_scale, name), val)
@@ -235,7 +235,7 @@ def scale_set_landmarks(path_set, scales=DEFAULT_SCALES):
     :return dict:
     """
     logging.debug('> processing: %s', path_set)
-    path_scale100 = os.path.join(path_set, FOLDER_TEMPLATE % 100)
+    path_scale100 = os.path.join(path_set, f"scale-{100}pc")
     if not os.path.isdir(path_scale100):
         logging.error('missing base scale 100pc in "%s"', path_scale100)
         return
@@ -244,7 +244,7 @@ def scale_set_landmarks(path_set, scales=DEFAULT_SCALES):
     dict_lnds = {os.path.basename(p): pd.read_csv(p, index_col=0) for p in list_csv}
     set_scales = {}
     for sc in (sc for sc in scales if sc not in [100]):  # drop the base scale
-        folder_name = FOLDER_TEMPLATE % sc
+        folder_name = f"scale-{sc}pc"
         path_scale = create_folder(os.path.join(path_set, folder_name))
         for name in dict_lnds:
             df_scale = dict_lnds[name] * (sc / 100.)
