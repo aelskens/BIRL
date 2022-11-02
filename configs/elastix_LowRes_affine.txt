@@ -1,4 +1,4 @@
-// Example parameter file for B-spline registration
+// Example parameter file for Affine registration
 // C-style comments: //
 
 // The internal pixel type, used for internal computations
@@ -105,7 +105,7 @@
 // which usually works well. In case of unusual high-resolution images
 // (eg histology) it is necessary to increase this value a bit, to the size
 // of the "smallest visible structure" in the image:
-(MaximumStepLength 100.0)
+(MaximumStepLength 5.0)
 
 // **************** Image sampling **********************
 
@@ -128,7 +128,7 @@
 // It may improve accuracy if you set this to 3. Never use 0.
 // An order of 1 gives linear interpolation. This is in most
 // applications a good choice.
-(BSplineInterpolationOrder 2)
+(BSplineInterpolationOrder 1)
 
 // Order of B-Spline interpolation used for applying the final
 // deformation.

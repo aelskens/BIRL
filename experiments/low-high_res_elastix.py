@@ -65,13 +65,15 @@ import os
 import shutil
 import sys
 import re
+import time
 
 import numpy as np
 import pandas as pd
+from skimage.color import rgb2gray
 
 sys.path += [os.path.abspath('.'), os.path.abspath('..')]  # Add path to root
 from birl.benchmark import ImRegBenchmark
-from birl.utilities.data_io import load_landmarks, save_landmarks, save_landmarks_pts
+from birl.utilities.data_io import create_folder, save_image, load_image, load_landmarks, save_landmarks, save_landmarks_pts
 from birl.utilities.experiments import exec_commands, iterate_mproc_map
 from birl.utilities.dataset import REEXP_FOLDER_SCALE
 from bm_experiments import bm_comp_perform
@@ -140,7 +142,7 @@ class LowHighResElastix(ImRegBenchmark):
         self.exec_elastix = _exec_update(self.EXEC_ELASTIX)
         self.exec_transformix = _exec_update(self.EXEC_TRANSFX)
 
-    def _prepare_img_registration(self, item):
+    def _low_res_preprocessing(self, item):
         """ generate (if not already present) low resolution images X1
         from the inputs and convert them into grayscale
 
@@ -154,15 +156,32 @@ class LowHighResElastix(ImRegBenchmark):
 
         uppath = lambda _path, n: os.sep.join(_path.split(os.sep)[:-n])
 
-        def _get_1X_image(path_img_scale_col):
-            path_img, scale, col = path_img_scale_col
-            path_img_low_res = re.sub(REEXP_FOLDER_SCALE, f'scale-{scale}pc', path_img)
-            
-            if os.path.exists(path_img_low_res):
-                return self._relativize_path(path_img_low_res, destination='path_exp'), col
+        def __path_img(path_img, pproc):
+            img_name, img_ext = os.path.splitext(os.path.basename(path_img))
+            return os.path.join(path_dir, img_name + '_' + pproc + img_ext)
 
-            path_img_low_res = wrap_scale_image((path_img, scale), image_ext='.png')
-            return self._relativize_path(path_img_low_res, destination='path_exp'), col
+        def __save_img(col, path_img_new, img):
+            col_temp = col + self.COL_IMAGE_EXT_TEMP
+            if isinstance(item.get(col_temp), str):
+                path_img = self._absolute_path(item[col_temp], destination='expt')
+                os.remove(path_img)
+            save_image(path_img_new, img)
+            return self._relativize_path(path_img_new, destination='path_exp'), col
+
+        def __convert_gray(path_img_col):
+            path_img, col = path_img_col
+            path_img_new = __path_img(path_img, 'gray')
+            __save_img(col, path_img_new, rgb2gray(load_image(path_img)))
+            return self._relativize_path(path_img_new, destination='path_exp'), col
+
+        def _get_1X_lum_image(path_img_scale_col):
+            path_img, scale, col = path_img_scale_col
+            path_img_low_res = re.sub(REEXP_FOLDER_SCALE, f'scale-{scale}pc', path_img).replace('jpg', 'png')
+            
+            if not os.path.exists(path_img_low_res):
+                wrap_scale_image((path_img, scale), image_ext='.png')
+
+            return __convert_gray((path_img_low_res, col))
 
         # Get rescaling percentage
         tissue = os.path.basename(uppath(path_im_ref, 2)).split('_')[0]
@@ -175,7 +194,7 @@ class LowHighResElastix(ImRegBenchmark):
 
         # Fetch or generate low resolution X1 images and convert them into grayscale
         argv_params = [(path_im_ref, scale, self.COL_IMAGE_REF), (path_im_move, scale, self.COL_IMAGE_MOVE)]
-        for path_img, col in iterate_mproc_map(_get_1X_image, argv_params, nb_workers=1, desc=None):
+        for path_img, col in iterate_mproc_map(_get_1X_lum_image, argv_params, nb_workers=1, desc=None):
             item[col + self.COL_IMAGE_EXT_TEMP] = path_img
 
         return item
@@ -256,6 +275,58 @@ class LowHighResElastix(ImRegBenchmark):
 
         return item
 
+    def _perform_registration(self, df_row):
+        """ run single registration experiment with all sub-stages
+
+        :param tuple(int,dict) df_row: row from iterated table
+        """
+        idx, row = df_row
+        logging.debug('-> perform single registration #%d...', idx)
+        # create folder for this particular experiment
+        row['ID'] = idx
+        row[self.COL_REG_DIR] = str(idx)
+        path_dir_reg = self._get_path_reg_dir(row)
+        # check whether the particular experiment already exists and have result
+        if self._ImRegBenchmark__check_exist_regist(idx, path_dir_reg):
+            return
+        create_folder(path_dir_reg)
+
+        time_start = time.time()
+        # do some requested pre-processing if required
+        row = self._low_res_preprocessing(row)
+        row[self.COL_TIME_PREPROC] = (time.time() - time_start) / 60.   ###########change
+        row = self._prepare_img_registration(row)
+        # if the pre-processing failed, return back None
+        if not row:
+            return
+
+        # measure execution time
+        time_start = time.time()
+        row = self._execute_img_registration(row)
+        # if the experiment failed, return back None
+        if not row:
+            return
+        # compute the registration time in minutes
+        row[self.COL_TIME] = (time.time() - time_start) / 60.
+        # remove some temporary images
+        row = self._ImRegBenchmark__remove_pproc_images(row)
+
+        row = self._parse_regist_results(row)
+        # if the post-processing failed, return back None
+        if not row:
+            return
+        row = self._clear_after_registration(row)
+
+        if self.params.get('visual', False):
+            logging.debug('-> visualise results of experiment: %r', idx)
+            self.visualise_registration(
+                (idx, row),
+                path_dataset=self.params.get('path_dataset'),
+                path_experiment=self.params.get('path_exp'),
+            )
+
+        return row
+
     @staticmethod
     def extend_parse(arg_parser):
         """ extent the basic arg parses by some extra required parameters
@@ -300,7 +371,7 @@ class LowHighResElastix(ImRegBenchmark):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     logging.info(__doc__)
-    arg_params, path_expt = BmElastix.main()
+    arg_params, path_expt = LowHighResElastix.main()
 
     if arg_params.get('run_comp_benchmark', False):
         bm_comp_perform.main(path_expt)
