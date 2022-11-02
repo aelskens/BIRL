@@ -900,17 +900,17 @@ class ImRegBenchmark(Experiment):
         image = draw_image_points(image_move, points_warp)
         _path = update_path(item[cls.COL_REG_DIR], pre_path=path_experiment)
         save_image(os.path.join(_path, cls.NAME_IMAGE_REF_POINTS_WARP), image)
-        del image
+        del image, image_move
 
         image_ref = load_image(path_img_ref)
         image_warp = cls._load_warped_image(item, path_experiment)
         image = overlap_two_images(image_ref, image_warp)
         _path = update_path(item[cls.COL_REG_DIR], pre_path=path_experiment)
         save_image(os.path.join(_path, cls.NAME_IMAGE_REF_WARP), image)
-        del image, image_warp
+        del image
 
         # visualise the landmarks move during registration
-        fig = draw_images_warped_landmarks(image_ref, image_move, points_ref, points_move, points_warp)
+        fig = draw_images_warped_landmarks(image_ref, image_warp, points_ref, points_move, points_warp)
         return fig
 
     @classmethod
