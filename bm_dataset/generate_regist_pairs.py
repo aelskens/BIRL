@@ -31,6 +31,7 @@ from birl.utilities.experiments import parse_arg_params
 
 # list of combination options
 OPTIONS_COMBINE = ('first2all', 'each2all')
+TISSUES_MAGNIFICATION = {"lung-lesion": 40, "lung-lobes": 10, "mammary-gland": 10, "mice-kidney": 20, "COAD": 10, "gastric": 40, "breast": 40, "kidney": 40}
 
 
 def arg_parse_params():
@@ -76,9 +77,12 @@ def generate_pairs(path_pattern_imgs, path_pattern_lnds, mode):
     if mode == 'each2all':
         pairs += [(i, j) for i in range(1, len(list_imgs)) for j in range(i + 1, len(list_imgs))]
 
+    uppath = lambda _path, n: os.sep.join(_path.split(os.sep)[:-n])
+
     reg_pairs = []
     for i, j in pairs:
         rec = dict(zip(ImRegBenchmark.COVER_COLUMNS, (list_imgs[i], list_imgs[j], list_lnds[i], list_lnds[j])))
+        rec['Full scale magnification'] = TISSUES_MAGNIFICATION[os.path.basename(uppath(list_imgs[i], 2)).split('_')[0]]
         img_size, img_diag = image_sizes(rec[ImRegBenchmark.COL_IMAGE_REF])
         rec.update({
             ImRegBenchmark.COL_IMAGE_SIZE: img_size,

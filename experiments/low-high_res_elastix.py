@@ -77,7 +77,7 @@ from birl.utilities.data_io import create_folder, save_image, load_image, load_l
 from birl.utilities.experiments import exec_commands, iterate_mproc_map
 from birl.utilities.dataset import REEXP_FOLDER_SCALE
 from bm_experiments import bm_comp_perform
-from bm_dataset.rescale_tissue_images import TISSUES_MAGNIFICATION, wrap_scale_image
+from bm_dataset.rescale_tissue_images import wrap_scale_image
 
 
 class LowHighResElastix(ImRegBenchmark):
@@ -154,8 +154,6 @@ class LowHighResElastix(ImRegBenchmark):
         path_dir = self._get_path_reg_dir(item)
         path_im_ref, path_im_move, _, _ = self._get_paths(item)
 
-        uppath = lambda _path, n: os.sep.join(_path.split(os.sep)[:-n])
-
         def __path_img(path_img, pproc):
             img_name, img_ext = os.path.splitext(os.path.basename(path_img))
             return os.path.join(path_dir, img_name + '_' + pproc + img_ext)
@@ -184,13 +182,7 @@ class LowHighResElastix(ImRegBenchmark):
             return __convert_gray((path_img_low_res, col))
 
         # Get rescaling percentage
-        tissue = os.path.basename(uppath(path_im_ref, 2)).split('_')[0]
-        try:
-            mag = TISSUES_MAGNIFICATION[tissue]
-        except Exception:
-            logging.exception(f'No magnification information on tissue: {tissue}')
-            return
-        scale = 100 / mag 
+        scale = 100 / item['Full scale magnification'] 
 
         # Fetch or generate low resolution X1 images and convert them into grayscale
         argv_params = [(path_im_ref, scale, self.COL_IMAGE_REF), (path_im_move, scale, self.COL_IMAGE_MOVE)]

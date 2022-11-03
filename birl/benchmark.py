@@ -167,12 +167,14 @@ class ImRegBenchmark(Experiment):
     COL_NB_LANDMARKS_INPUT = 'nb. dataset landmarks'
     #: number of warped landmarks
     COL_NB_LANDMARKS_WARP = 'nb. warped landmarks'
+    #: full scale magnification
+    COL_FULL_SCALE_MAGNIFICATION = 'Full scale magnification'
     #: required experiment parameters
     REQUIRED_PARAMS = Experiment.REQUIRED_PARAMS + ['path_table']
 
     # list of columns in cover csv
     COVER_COLUMNS = (COL_IMAGE_REF, COL_IMAGE_MOVE, COL_POINTS_REF, COL_POINTS_MOVE)
-    COVER_COLUMNS_EXT = tuple(list(COVER_COLUMNS) + [COL_IMAGE_SIZE, COL_IMAGE_DIAGONAL])
+    COVER_COLUMNS_EXT = tuple(list(COVER_COLUMNS) + [COL_FULL_SCALE_MAGNIFICATION, COL_IMAGE_SIZE, COL_IMAGE_DIAGONAL])
     COVER_COLUMNS_WRAP = tuple(
         list(COVER_COLUMNS) + [COL_IMAGE_REF_WARP, COL_IMAGE_MOVE_WARP, COL_POINTS_REF_WARP, COL_POINTS_MOVE_WARP]
     )

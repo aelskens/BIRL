@@ -33,7 +33,6 @@ from birl.utilities.experiments import get_nb_workers, is_iterable, iterate_mpro
 NB_WORKERS = get_nb_workers(0.5)
 DEFAULT_SCALES = (5, 10, 15, 20, 25, 50)
 IMAGE_EXTENSION = '.jpg'
-TISSUES_MAGNIFICATION = {"lung-lesion": 40, "lung-lobes": 10, "mammary-gland": 10, "mice-kidney": 20, "COAD": 10, "gastric": 40, "breast": 40, "kidney": 40}
 # IMWRITE_PARAMS = (cv.IMWRITE_JPEG_QUALITY, 100)
 
 def arg_parse_params():
