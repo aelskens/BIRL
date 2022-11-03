@@ -197,6 +197,8 @@ class LowHighResElastix(ImRegBenchmark):
         for path_img, col in iterate_mproc_map(_get_1X_lum_image, argv_params, nb_workers=1, desc=None):
             item[col + self.COL_IMAGE_EXT_TEMP] = path_img
 
+        self.params['preprocessing'] = ['low_res_gray']
+
         return item
 
     def _generate_regist_command(self, item):
