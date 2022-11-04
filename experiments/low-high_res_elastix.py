@@ -176,8 +176,8 @@ class LowHighResElastix(ImRegBenchmark):
             path_img, scale, col = path_img_scale_col
             path_img_low_res = re.sub(REEXP_FOLDER_SCALE, f'scale-{scale}pc', path_img).replace('jpg', 'png')
             
-            if not os.path.exists(path_img_low_res):
-                wrap_scale_image((path_img, scale), image_ext='.png')
+            if self.params.get('compute_x1', None) or not os.path.exists(path_img_low_res):
+                wrap_scale_image((path_img, scale), image_ext='.png', overwrite=True)
 
             return __convert_gray((path_img_low_res, col))
 
@@ -337,6 +337,9 @@ class LowHighResElastix(ImRegBenchmark):
         )
         arg_parser.add_argument(
             '-cfg', '--path_config', required=True, type=str, help='path to the elastic configuration'
+        )
+        arg_parser.add_argument(
+            '--compute_x1', dest='compute_x1', action='store_true', help='whether the low resolution images (x1) should explicitly be recomputed'
         )
         return arg_parser
 
