@@ -31,7 +31,40 @@ from birl.utilities.experiments import parse_arg_params
 
 # list of combination options
 OPTIONS_COMBINE = ('first2all', 'each2all')
-TISSUES_MAGNIFICATION = {"lung-lesion": 40, "lung-lobes": 10, "mammary-gland": 10, "mice-kidney": 20, "COAD": 10, "gastric": 40, "breast": 40, "kidney": 40}
+TISSUES_ACQUISITION_SPECS = {
+    "lung-lesion": {
+        "full_scale_magnification": 40,
+        "pixel_size": 0.174
+    }, 
+    "lung-lobes": {
+        "full_scale_magnification": 10,
+        "pixel_size": 1.274
+    },
+    "mammary-gland": {
+        "full_scale_magnification": 10,
+        "pixel_size": 2.294
+    }, 
+    "mice-kidney": {
+        "full_scale_magnification": 20,
+        "pixel_size": 0.227
+    }, 
+    "COAD": {
+        "full_scale_magnification": 10,
+        "pixel_size": 0.468
+    }, 
+    "gastric": {
+        "full_scale_magnification": 40,
+        "pixel_size": 0.253
+    }, 
+    "breast": {
+        "full_scale_magnification": 40,
+        "pixel_size": 0.253
+    }, 
+    "kidney": {
+        "full_scale_magnification": 40,
+        "pixel_size": 0.253
+    }
+}
 
 
 def arg_parse_params():
@@ -82,7 +115,10 @@ def generate_pairs(path_pattern_imgs, path_pattern_lnds, mode):
     reg_pairs = []
     for i, j in pairs:
         rec = dict(zip(ImRegBenchmark.COVER_COLUMNS, (list_imgs[i], list_imgs[j], list_lnds[i], list_lnds[j])))
-        rec['Full scale magnification'] = TISSUES_MAGNIFICATION[os.path.basename(uppath(list_imgs[i], 2)).split('_')[0]]
+        tissue = os.path.basename(uppath(list_imgs[i], 2)).split('_')[0]
+        rec['Full scale magnification'] = TISSUES_ACQUISITION_SPECS[tissue]['full_scale_magnification']
+        # pixel size in microns
+        rec['Pixel size'] = TISSUES_ACQUISITION_SPECS[tissue]['pixel_size']
         img_size, img_diag = image_sizes(rec[ImRegBenchmark.COL_IMAGE_REF])
         rec.update({
             ImRegBenchmark.COL_IMAGE_SIZE: img_size,

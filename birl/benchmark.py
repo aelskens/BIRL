@@ -33,6 +33,7 @@ from birl.utilities.drawing import draw_image_points, draw_images_warped_landmar
 from birl.utilities.evaluate import (
     compute_affine_transf_diff,
     compute_target_regist_error_statistic,
+    compute_RMSE,
     compute_tre_robustness,
 )
 from birl.utilities.experiments import (
@@ -169,12 +170,14 @@ class ImRegBenchmark(Experiment):
     COL_NB_LANDMARKS_WARP = 'nb. warped landmarks'
     #: full scale magnification
     COL_FULL_SCALE_MAGNIFICATION = 'Full scale magnification'
+    #: pixel size
+    COL_PIXEL_SIZE = 'Pixel size'
     #: required experiment parameters
     REQUIRED_PARAMS = Experiment.REQUIRED_PARAMS + ['path_table']
 
     # list of columns in cover csv
     COVER_COLUMNS = (COL_IMAGE_REF, COL_IMAGE_MOVE, COL_POINTS_REF, COL_POINTS_MOVE)
-    COVER_COLUMNS_EXT = tuple(list(COVER_COLUMNS) + [COL_FULL_SCALE_MAGNIFICATION, COL_IMAGE_SIZE, COL_IMAGE_DIAGONAL])
+    COVER_COLUMNS_EXT = tuple(list(COVER_COLUMNS) + [COL_FULL_SCALE_MAGNIFICATION, COL_PIXEL_SIZE, COL_IMAGE_SIZE, COL_IMAGE_DIAGONAL])
     COVER_COLUMNS_WRAP = tuple(
         list(COVER_COLUMNS) + [COL_IMAGE_REF_WARP, COL_IMAGE_MOVE_WARP, COL_POINTS_REF_WARP, COL_POINTS_MOVE_WARP]
     )
@@ -799,7 +802,7 @@ class ImRegBenchmark(Experiment):
             # removing the affine transform and assume only local/elastic deformation
             _, _, points1, _ = estimate_affine_transform(points1, points2)
 
-        _, stats = compute_target_regist_error_statistic(points1, points2)
+        diffs, stats = compute_target_regist_error_statistic(points1, points2)
         if img_diag is not None:
             df_experiments.at[idx, cls.COL_IMAGE_DIAGONAL] = img_diag
         # update particular idx
@@ -815,6 +818,9 @@ class ImRegBenchmark(Experiment):
             df_experiments.at[idx, name] = stats[n_stat]
         for n_stat in ['overlap points']:
             df_experiments.at[idx, '%s (%s)' % (n_stat, state)] = stats[n_stat]
+
+        if state in ['init', 'target']:
+            df_experiments.at[idx, f'RMSE {state}'] = compute_RMSE(diffs)
 
     @classmethod
     def _load_warped_image(cls, item, path_experiment=None):

@@ -1018,6 +1018,6 @@ def deconv_he(img: np.array, stain: str, Io: int = 240, alpha: int = 1, beta: in
         logging.warning(f'unrecognized stain: {stain}')
     
     np.clip(out, a_min=0, a_max=254, out=out)
-    out = 255 - np.reshape(out, (h, w)).astype(np.uint8)
+    out = np.reshape(out, (h, w)).astype(np.uint8)
 
     return out

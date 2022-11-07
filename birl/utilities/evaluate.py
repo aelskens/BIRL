@@ -93,6 +93,15 @@ def compute_target_regist_error_statistic(points_ref, points_est):
     return diffs, dict_stat
 
 
+def compute_RMSE(diffs):
+    """
+    TO DO
+    """
+    rmse = np.sqrt(np.sum(np.power(diffs, 2))/len(diffs))
+
+    return rmse
+    
+
 def compute_tre_robustness(points_target, points_init, points_warp):
     """ compute robustness as improvement for each TRE
 
