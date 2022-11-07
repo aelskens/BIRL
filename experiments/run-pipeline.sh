@@ -3,10 +3,20 @@
 export DISPLAY=""
 # DEFINE GLOBAL PARAMS
 jobs=3
-table="/BIRL/io/inputs/dataset_ANHIR/dataset_medium.csv"
+
+echo Tissue?
+read tissue
+
+echo Percentage
+read percentage
+
+echo Config?
+read config
+
+table="/io/inputs/dataset_ANHIR/${tissue}_dataset_medium_${percentage}pc.csv"
 # this folder has to contain bland of images and landmarks
-dataset="/BIRL/io/inputs/dataset_ANHIR/images"
-results="/BIRL/io/outputs/dataset_ANHIR/"
+dataset="/io/inputs/dataset_ANHIR/images"
+results="/io/outputs/dataset_ANHIR/"
 apps="/BIRL/Applications"
 
 preprocessings=("gray")
@@ -14,13 +24,12 @@ preprocessings=("gray")
 for pproc in "${preprocessings[@]}"
 do
 
-    python bm_experiments/bm_elastix.py \
+    python experiments/low-high_res_elastix.py \
          -t $table \
          -d $dataset \
          -o $results \
          -elastix "$apps/elastix/bin" \
-         -cfg ./configs/elastix_rigid.txt \
-         -pproc $pproc \
+         -cfg "./configs/elastix_${config}_affine.txt" \
          --visual --unique --nb_workers $jobs
 
 done
