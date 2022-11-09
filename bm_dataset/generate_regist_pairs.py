@@ -88,6 +88,26 @@ def arg_parse_params():
     return args
 
 
+def remove_unmatching_items(images, landmarks):
+    """
+    TO DO
+    """
+    if len(images) == len(landmarks):
+        return
+    elif len(images) > len(landmarks):
+        to_shorten = images
+        reference = landmarks
+    else:
+        to_shorten = landmarks
+        reference = images
+
+    for i in to_shorten:
+        name = os.path.basename(i).split('.')[0]
+        e = reference[0].replace(os.path.basename(reference[0]), f"{name}.csv")
+        if e not in reference:
+            to_shorten.remove(i)
+
+
 def generate_pairs(path_pattern_imgs, path_pattern_lnds, mode):
     """ generate the registration pairs as reference and moving images
 
@@ -98,6 +118,9 @@ def generate_pairs(path_pattern_imgs, path_pattern_lnds, mode):
     """
     list_imgs = sorted(glob.glob(path_pattern_imgs))
     list_lnds = sorted(glob.glob(path_pattern_lnds))
+
+    remove_unmatching_items(list_imgs, list_lnds)
+
     if len(list_imgs) != len(list_lnds):
         raise RuntimeError(
             'the list of loaded images (%i) and landmarks (%i) is different length' % (len(list_imgs), len(list_lnds))
