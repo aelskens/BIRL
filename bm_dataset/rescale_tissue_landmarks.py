@@ -244,6 +244,8 @@ def scale_set_landmarks(path_set, scales=DEFAULT_SCALES):
     dict_lnds = {os.path.basename(p): pd.read_csv(p, index_col=0) for p in list_csv}
     set_scales = {}
     for sc in (sc for sc in scales if sc not in [100]):  # drop the base scale
+        if int(sc) == sc:
+            sc = int(sc)
         folder_name = f"scale-{sc}pc"
         path_scale = create_folder(os.path.join(path_set, folder_name))
         for name in dict_lnds:
