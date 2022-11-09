@@ -66,10 +66,10 @@ def scale_image(img_path, scale, image_ext=IMAGE_EXTENSION, overwrite=False):
     name, _ = os.path.splitext(os.path.basename(img_path))
     base_scale = parse_path_scale(os.path.dirname(img_path))
 
-    try:
-        path_dir = os.path.join(base, f"scale-{scale:d}pc")
-    except:
-        path_dir = os.path.join(base, f"scale-{scale:.1f}pc")
+    if int(scale) == scale:
+        scale = int(scale)
+
+    path_dir = os.path.join(base, f"scale-{scale}pc")
 
     create_folder(path_dir)
 
