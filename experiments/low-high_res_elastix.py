@@ -182,7 +182,9 @@ class LowHighResElastix(ImRegBenchmark):
             return __convert_gray((path_img_low_res, col))
 
         # Get rescaling percentage
-        scale = 100 / item['Full scale magnification'] 
+        scale = 100 / item['Full scale magnification']
+        if int(scale) == scale:
+            scale = int(scale)
 
         # Fetch or generate low resolution X1 images and convert them into grayscale
         argv_params = [(path_im_ref, scale, self.COL_IMAGE_REF), (path_im_move, scale, self.COL_IMAGE_MOVE)]
