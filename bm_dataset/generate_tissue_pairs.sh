@@ -16,6 +16,7 @@ for f in /io/inputs/dataset_ANHIR/images/${tissue}_*; do
             -i "$f/scale-${percentage}pc/*.$extension" \
             -l "/io/inputs/dataset_ANHIR/landmarks/$(basename $f)/scale-${percentage}pc/*.csv" \
             -csv "/io/inputs/dataset_ANHIR/${tissue}_dataset_medium_${percentage}pc.csv" \
+            -rot "/io/inputs/dataset_ANHIR/initial_rotation.csv" \
             --mode each2all
     fi
 done

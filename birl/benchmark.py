@@ -156,10 +156,14 @@ class ImRegBenchmark(Experiment):
     COL_TIME = 'Execution time [minutes]'
     #: measured time of image pre-processing in minutes
     COL_TIME_PREPROC = 'Pre-processing time [minutes]'
-    #: tuple of image size
-    COL_IMAGE_SIZE = 'Image size [pixels]'
-    #: image diagonal in pixels
-    COL_IMAGE_DIAGONAL = 'Image diagonal [pixels]'
+    #: tuple of target image size
+    COL_TARGET_IMAGE_SIZE = 'Target image size [pixels]'
+    #: tuple of source image size
+    COL_SOURCE_IMAGE_SIZE = 'Source image size [pixels]'
+    #: target image diagonal in pixels
+    COL_TARGET_IMAGE_DIAGONAL = 'Target image diagonal [pixels]'
+    #: source image diagonal in pixels
+    COL_SOURCE_IMAGE_DIAGONAL = 'Source image diagonal [pixels]'
     #: define train / test status
     COL_STATUS = 'status'
     #: extension to the image column name for temporary pre-process image
@@ -172,12 +176,14 @@ class ImRegBenchmark(Experiment):
     COL_FULL_SCALE_MAGNIFICATION = 'Full scale magnification'
     #: pixel size
     COL_PIXEL_SIZE = 'Pixel size'
+    #: initial rotation
+    COL_INITIAL_ROTATION = 'Initial rotation'
     #: required experiment parameters
     REQUIRED_PARAMS = Experiment.REQUIRED_PARAMS + ['path_table']
 
     # list of columns in cover csv
     COVER_COLUMNS = (COL_IMAGE_REF, COL_IMAGE_MOVE, COL_POINTS_REF, COL_POINTS_MOVE)
-    COVER_COLUMNS_EXT = tuple(list(COVER_COLUMNS) + [COL_FULL_SCALE_MAGNIFICATION, COL_PIXEL_SIZE, COL_IMAGE_SIZE, COL_IMAGE_DIAGONAL])
+    COVER_COLUMNS_EXT = tuple(list(COVER_COLUMNS) + [COL_FULL_SCALE_MAGNIFICATION, COL_PIXEL_SIZE, COL_TARGET_IMAGE_SIZE, COL_SOURCE_IMAGE_SIZE, COL_TARGET_IMAGE_DIAGONAL, COL_SOURCE_IMAGE_DIAGONAL, COL_INITIAL_ROTATION])
     COVER_COLUMNS_WRAP = tuple(
         list(COVER_COLUMNS) + [COL_IMAGE_REF_WARP, COL_IMAGE_MOVE_WARP, COL_POINTS_REF_WARP, COL_POINTS_MOVE_WARP]
     )
@@ -675,7 +681,7 @@ class ImRegBenchmark(Experiment):
         :param str path_img_ref: optional path to the reference image
         :return float|None: image diagonal
         """
-        img_diag = dict(item).get(cls.COL_IMAGE_DIAGONAL)
+        img_diag = dict(item).get(cls.COL_TARGET_IMAGE_DIAGONAL)
         if not img_diag and path_img_ref and os.path.isfile(path_img_ref):
             _, img_diag = image_sizes(path_img_ref)
         return img_diag
@@ -711,7 +717,7 @@ class ImRegBenchmark(Experiment):
         # load common landmarks and image size
         points_ref, points_move, path_img_ref = cls._load_landmarks(row, path_dataset)
         img_diag = cls._image_diag(row, path_img_ref)
-        df_experiments.loc[idx, cls.COL_IMAGE_DIAGONAL] = img_diag
+        df_experiments.loc[idx, cls.COL_TARGET_IMAGE_DIAGONAL] = img_diag
 
         # compute landmarks statistic
         cls.compute_registration_accuracy(
@@ -804,7 +810,7 @@ class ImRegBenchmark(Experiment):
 
         diffs, stats = compute_target_regist_error_statistic(points1, points2)
         if img_diag is not None:
-            df_experiments.at[idx, cls.COL_IMAGE_DIAGONAL] = img_diag
+            df_experiments.at[idx, cls.COL_TARGET_IMAGE_DIAGONAL] = img_diag
         # update particular idx
         for n_stat in (n for n in stats if n not in ['overlap points']):
             # if it not one of the simplified names
