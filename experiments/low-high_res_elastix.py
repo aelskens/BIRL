@@ -1,5 +1,6 @@
 """
 Low and High resolution Elastix registration method.
+TO DO
 
 **Installation**
 
@@ -66,10 +67,13 @@ import shutil
 import sys
 import re
 import time
+import math
 
 import numpy as np
 import pandas as pd
 from skimage.color import rgb2gray
+from jinja2 import Template
+from ast import literal_eval as make_tuple
 
 sys.path += [os.path.abspath('.'), os.path.abspath('..')]  # Add path to root
 from birl.benchmark import ImRegBenchmark
@@ -111,6 +115,8 @@ class LowHighResElastix(ImRegBenchmark):
     NAME_IMAGE_WARPED = 'result.*'
     #: default name of warped landmarks
     NAME_LNDS_WARPED = 'outputpoints.txt'
+    #: initial transformation file
+    COL_INITIAL_TF = 'Initial TF'
     #: command template for image registration
     COMMAND_REGISTRATION = \
         '%(exec_elastix)s' \
@@ -141,6 +147,55 @@ class LowHighResElastix(ImRegBenchmark):
 
         self.exec_elastix = _exec_update(self.EXEC_ELASTIX)
         self.exec_transformix = _exec_update(self.EXEC_TRANSFX)
+
+    def write_initial_transform_file(self, filepath, trans, parameters, init_file, size, center=None):
+        """
+        TO DO
+        """
+        with open('configs/init_transform_tpl.txt', 'r') as f:
+            template = Template(f.read())
+
+            x, y = size
+            
+            if center is None:
+                center = (float(x)/2.0, float(y)/2.0)
+            
+            template.stream(
+                trans=trans, 
+                num_param=len(parameters), 
+                init_file=init_file, 
+                param=' '.join(map(str, parameters)), 
+                image_x=x, 
+                image_y=y, 
+                center_x=center[0], 
+                center_y=center[1]
+            ).dump(filepath)
+
+        return filepath
+
+    def _prepare_img_registration(self, item):
+        """ Creating initial transformation file if needed
+
+        :param dict item: dictionary with registration params
+        :return dict: the same or updated registration info
+        """
+        angle = item['Initial rotation']
+        if angle == 0:
+            logging.debug('.. no preparing before registration experiment')
+            return item
+        
+        # METHOD 1
+        # logging.debug('.. creating initial transform file')
+        # filepath = os.path.join(self._get_path_reg_dir(item), f'Initial_{angle}_rotation_transformation.txt')
+
+        # item[self.COL_INITIAL_TF] = self.write_initial_transform_file(filepath, '\"EulerTransform\"', [math.radians(float(angle)), 0, 0], 'NoInitialTransform', make_tuple(item['Source image size [pixels]']))
+
+        # METHOD 2
+        from skimage.transform import rotate
+        path_img = self._absolute_path(item[self.COL_IMAGE_MOVE + self.COL_IMAGE_EXT_TEMP], destination='expt')
+        save_image(path_img, rotate(load_image(path_img), angle, resize=True))
+
+        return item
 
     def _low_res_preprocessing(self, item):
         """ generate (if not already present) low resolution images X1
@@ -211,6 +266,11 @@ class LowHighResElastix(ImRegBenchmark):
             'output': path_dir,
             'config': self.params['path_config'],
         }
+        
+        init_file = item.get(self.COL_INITIAL_TF, None)
+        if init_file:
+            cmd += f' -t0 {init_file}'
+
         return cmd
 
     def _extract_warped_image_landmarks(self, item):
