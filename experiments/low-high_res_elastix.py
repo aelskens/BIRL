@@ -78,6 +78,11 @@ from skimage.filters import threshold_otsu
 from skimage.measure import centroid
 from skimage.io import imsave
 from functools import partial
+from skimage.color import rgb2hsv
+from skimage.filters import gaussian
+from skimage.morphology import closing, square, disk, binary_erosion, opening
+from skimage.measure import label, regionprops
+from scipy import ndimage
 
 sys.path += [os.path.abspath('.'), os.path.abspath('..')]  # Add path to root
 from birl.benchmark import ImRegBenchmark
@@ -248,6 +253,62 @@ class LowHighResElastix(ImRegBenchmark):
                     item[col] = self._relativize_path(path_img, destination='path_exp')
 
         return item
+
+    def _preregistration(self, item):
+        """
+        TO DO
+        maybe save mask
+        """
+        def get_segmented_tissue(path_im, params):
+            """
+            TO DO
+            """
+            im_S = rgb2hsv(imread(path_im))[:, :, 1] ## load image
+            
+            blur = gaussian(im_S, sigma=0.5, preserve_range=True)
+            
+            threshold = np.percentile(blur, params['threshold'])
+            
+            if params.get('closing', None) is not None:
+                bw = closing(blur > threshold, square(params['closing']))
+            elif params.get('opening', None) is not None:
+                bw = opening(blur > threshold, square(params['opening']))
+            else:
+                bw = (blur > threshold)
+
+            filled = ndimage.binary_fill_holes(bw)
+
+            if params.get('erosion', None) is not None:
+                final = binary_erosion(filled, footprint=disk(params['erosion']))
+            elif params.get('opening', None) is not None:
+                final = opening(filled, disk(params['opening']))
+            else:
+                final = filled
+            
+            return final
+
+        def get_region_information(path_im, params):
+            """
+            TO DO
+            """
+            segmented_tissue = get_segmented_tissue(path_im, params)
+            label_image = label(segmented_tissue)
+            _, region  = max([(region.area, region) for region in regionprops(label_image)], key=lambda x:x[0])
+
+            minr, minc, maxr, maxc = region.bbox
+
+            region_info = {
+                'orientation': region.orientation,
+                'centroid_local': region.centroid_local,
+                'eccentricity': region.eccentricity,
+                'region_bbox_mask': (label_image==region.label)[minr:maxr, minc:maxc]
+            }
+
+            return region_info
+        
+        # do mproc ...
+
+        return
 
     def _low_res_preprocessing(self, item):
         """ generate (if not already present) low resolution images X1
@@ -425,11 +486,17 @@ class LowHighResElastix(ImRegBenchmark):
         if self._ImRegBenchmark__check_exist_regist(idx, path_dir_reg):
             return
         create_folder(path_dir_reg)
-
+        
+        time_start = time.time()
+        # estimate the rotaion between the two input images
+        row = self._preregistration(row)
+        row[self.COL_TIME_PREREGIST] = (time.time() - time_start) / 60.
+        
         time_start = time.time()
         # do some requested pre-processing if required
         row = self._low_res_preprocessing(row)
         row[self.COL_TIME_PREPROC] = (time.time() - time_start) / 60.   ###########change
+        
         row = self._prepare_img_registration(row)
         # if the pre-processing failed, return back None
         if not row:
