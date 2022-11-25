@@ -74,6 +74,10 @@ import pandas as pd
 from skimage.color import rgb2gray
 from jinja2 import Template
 from ast import literal_eval as make_tuple
+from skimage.filters import threshold_otsu
+from skimage.measure import centroid
+from skimage.io import imsave
+from functools import partial
 
 sys.path += [os.path.abspath('.'), os.path.abspath('..')]  # Add path to root
 from birl.benchmark import ImRegBenchmark
@@ -173,27 +177,75 @@ class LowHighResElastix(ImRegBenchmark):
 
         return filepath
 
+    # def _prepare_img_registration(self, item):
+    #     """ Creating initial transformation file if needed
+
+    #     :param dict item: dictionary with registration params
+    #     :return dict: the same or updated registration info
+    #     """
+    #     angle = item['Initial rotation']
+    #     if angle == 0:
+    #         logging.debug('.. no preparing before registration experiment')
+    #         return item
+        
+    #     # METHOD 1
+    #     # logging.debug('.. creating initial transform file')
+    #     # filepath = os.path.join(self._get_path_reg_dir(item), f'Initial_{angle}_rotation_transformation.txt')
+
+    #     # item[self.COL_INITIAL_TF] = self.write_initial_transform_file(filepath, '\"EulerTransform\"', [math.radians(float(angle)), 0, 0], 'NoInitialTransform', make_tuple(item['Source image size [pixels]']))
+
+    #     # METHOD 2
+    #     # from skimage.transform import rotate
+    #     # path_img = self._absolute_path(item[self.COL_IMAGE_MOVE + self.COL_IMAGE_EXT_TEMP], destination='expt')
+    #     # save_image(path_img, rotate(load_image(path_img), angle, resize=True))
+
+    #     return item
+    
     def _prepare_img_registration(self, item):
-        """ Creating initial transformation file if needed
+        """ Create tissue masks for both input image and compute the moving image's centroid
 
         :param dict item: dictionary with registration params
         :return dict: the same or updated registration info
         """
-        angle = item['Initial rotation']
-        if angle == 0:
-            logging.debug('.. no preparing before registration experiment')
-            return item
-        
-        # METHOD 1
-        # logging.debug('.. creating initial transform file')
-        # filepath = os.path.join(self._get_path_reg_dir(item), f'Initial_{angle}_rotation_transformation.txt')
+        def __add_padding(im, padding=None):
+            if not padding:
+                return im
 
-        # item[self.COL_INITIAL_TF] = self.write_initial_transform_file(filepath, '\"EulerTransform\"', [math.radians(float(angle)), 0, 0], 'NoInitialTransform', make_tuple(item['Source image size [pixels]']))
+            padded = np.zeros(padding)
 
-        # METHOD 2
-        from skimage.transform import rotate
-        path_img = self._absolute_path(item[self.COL_IMAGE_MOVE + self.COL_IMAGE_EXT_TEMP], destination='expt')
-        save_image(path_img, rotate(load_image(path_img), angle, resize=True))
+            x_center = (padding[1] - im.shape[1]) // 2
+            y_center = (padding[0] - im.shape[0]) // 2
+
+            # copy img image into center of result image
+            padded[y_center:y_center+im.shape[0], x_center:x_center+im.shape[1]] = im
+
+            return padded
+                
+        def __get_mask_images(path_im_mask_name_col, path_dir, percentage=1, padding=None):
+            path_im, mask_name, col = path_im_mask_name_col
+            percentage = 1.05
+
+            path_im_tmp = os.path.join(path_dir, os.path.basename(path_im)) if not padding else os.path.join(path_dir, os.path.basename(path_im)).replace('gray.png', 'not_padded.png')
+            im_ref = load_image(path_im_tmp, normalized=False, force_rgb=False)
+            mask = __add_padding(im_ref < percentage*threshold_otsu(im_ref), padding)
+            img_name, img_ext = os.path.splitext(os.path.basename(path_im_tmp))
+            path_mask = os.path.join(os.path.dirname(path_im_tmp), img_name.replace('_not_padded', '') + f'_{mask_name}' + img_ext)
+            imsave(path_mask, mask)
+
+            return path_mask, mask_name, col
+
+        mode = "skip"
+        if mode in ["use_mask", "use_binary"]:
+            argv_params = [
+                (item[self.COL_IMAGE_REF + self.COL_IMAGE_EXT_TEMP], "fMask", self.COL_IMAGE_REF + self.COL_IMAGE_EXT_TEMP), 
+                (item[self.COL_IMAGE_MOVE + self.COL_IMAGE_EXT_TEMP], "mMask", self.COL_IMAGE_MOVE + self.COL_IMAGE_EXT_TEMP)
+            ]
+            get_mask_images = partial(__get_mask_images, path_dir=self._get_path_reg_dir(item), padding=item.get("Padding", None))
+            for path_img, mask, col in iterate_mproc_map(get_mask_images, argv_params, nb_workers=1, desc=None):
+                if mode == "use_mask":
+                    item[mask] = path_img
+                else:
+                    item[col] = self._relativize_path(path_img, destination='path_exp')
 
         return item
 
@@ -221,29 +273,53 @@ class LowHighResElastix(ImRegBenchmark):
             save_image(path_img_new, img)
             return self._relativize_path(path_img_new, destination='path_exp'), col
 
-        def __convert_gray(path_img_col):
+        def __add_padding(path_img, padding=None):
+            if not padding:
+                return rgb2gray(load_image(path_img))
+
+            im = rgb2gray(load_image(path_img))
+            padded = np.zeros(padding)
+
+            x_center = (padding[1] - im.shape[1]) // 2
+            y_center = (padding[0] - im.shape[0]) // 2
+
+            # copy img image into center of result image
+            padded[y_center:y_center+im.shape[0], x_center:x_center+im.shape[1]] = im
+
+            return padded
+
+        def __convert_gray(path_img_col, padding=None):
             path_img, col = path_img_col
             path_img_new = __path_img(path_img, 'gray')
-            __save_img(col, path_img_new, rgb2gray(load_image(path_img)))
+            __save_img(col, path_img_new, __add_padding(path_img, padding))
+            if padding:
+                __save_img(col, __path_img(path_img, 'not_padded'), __add_padding(path_img))
             return self._relativize_path(path_img_new, destination='path_exp'), col
 
-        def _get_1X_lum_image(path_img_scale_col):
+        def _get_1X_lum_image(path_img_scale_col, padding=None):
             path_img, scale, col = path_img_scale_col
             path_img_low_res = re.sub(REEXP_FOLDER_SCALE, f'scale-{scale}pc', path_img).replace('jpg', 'png')
             
             if self.params.get('compute_x1', None) or not os.path.exists(path_img_low_res):
                 wrap_scale_image((path_img, scale), image_ext='.png', overwrite=True)
 
-            return __convert_gray((path_img_low_res, col))
+            return __convert_gray((path_img_low_res, col), padding)
 
         # Get rescaling percentage
         scale = 100 / item['Full scale magnification']
         if int(scale) == scale:
             scale = int(scale)
 
+        # Get max width and height for the padding
+        h_target, w_target = make_tuple(item["Target image size [pixels]"])
+        h_source, w_source = make_tuple(item["Source image size [pixels]"])
+        if (h_target, w_target) != (h_source, w_source):
+            item['Padding'] = (max([h_target, h_source]), max(w_target, w_source))
+        
         # Fetch or generate low resolution X1 images and convert them into grayscale
         argv_params = [(path_im_ref, scale, self.COL_IMAGE_REF), (path_im_move, scale, self.COL_IMAGE_MOVE)]
-        for path_img, col in iterate_mproc_map(_get_1X_lum_image, argv_params, nb_workers=1, desc=None):
+        get_1X_lum_image = partial(_get_1X_lum_image, padding=item.get("Padding", None))
+        for path_img, col in iterate_mproc_map(get_1X_lum_image, argv_params, nb_workers=1, desc=None):
             item[col + self.COL_IMAGE_EXT_TEMP] = path_img
 
         self.params['preprocessing'] = ['low_res_gray']
@@ -266,6 +342,9 @@ class LowHighResElastix(ImRegBenchmark):
             'output': path_dir,
             'config': self.params['path_config'],
         }
+
+        if item.get('fMask', None):
+            cmd += f' -fMask {item["fMask"]} -mMask {item["mMask"]}'
         
         init_file = item.get(self.COL_INITIAL_TF, None)
         if init_file:
