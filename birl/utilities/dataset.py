@@ -24,10 +24,14 @@ from cv2 import (
 )
 from matplotlib.path import Path
 from PIL import Image
-from scipy import optimize, spatial
+from scipy import optimize, spatial, ndimage
 from skimage.color import hed2rgb, hsv2rgb, lab2lch, lab2rgb, lch2lab, luv2rgb, rgb2hed, rgb2hsv, rgb2lab, rgb2luv
 from skimage.exposure import rescale_intensity
-from skimage.filters import threshold_otsu
+from skimage.filters import threshold_otsu, gaussian
+from skimage.transform import rotate
+from sklearn.metrics import jaccard_score
+from skimage.measure import label, regionprops
+from skimage.morphology import closing, square, disk, binary_erosion, opening
 
 #: threshold of tissue/background presence on potential cutting line
 TISSUE_CONTENT = 0.01
@@ -1021,3 +1025,100 @@ def deconv_he(img: np.array, stain: str, Io: int = 240, alpha: int = 1, beta: in
     out = np.reshape(out, (h, w)).astype(np.uint8)
 
     return out
+
+
+def add_padding(im, padding=None, mask=False):
+    """
+    TO DO
+    """
+    if not padding:
+        return im
+
+    if mask:
+        tmp = np.zeros(padding)
+        padded = (tmp == 1)
+    else:
+        padded = np.zeros(padding)
+
+    x_center = (padding[1] - im.shape[1]) // 2
+    y_center = (padding[0] - im.shape[0]) // 2
+
+    # copy img image into center of result image
+    padded[y_center:y_center+im.shape[0], x_center:x_center+im.shape[1]] = im
+
+    return padded
+
+
+def get_segmented_tissue(im, params):
+    """
+    TO DO
+    """
+    im_S = rgb2hsv(im)[:, :, 1]
+    
+    blur = gaussian(im_S, sigma=0.5, preserve_range=True)
+    
+    threshold = np.percentile(blur, params['threshold'])
+    
+    if params.get('closing', None) is not None:
+        bw = closing(blur > threshold, square(params['closing']))
+    elif params.get('opening', None) is not None:
+        bw = opening(blur > threshold, square(params['opening']))
+    else:
+        bw = (blur > threshold)
+
+    filled = ndimage.binary_fill_holes(bw)
+
+    if params.get('erosion', None) is not None:
+        final = binary_erosion(filled, footprint=disk(params['erosion']))
+    elif params.get('opening', None) is not None:
+        final = opening(filled, disk(params['opening']))
+    else:
+        final = filled
+    
+    return final
+
+
+def get_square_border(im_1, im_2):
+    """
+    TO DO
+    """
+    border = 0
+    for s in (im_1.shape, im_2.shape):
+        _max = max(s[0], s[1])
+        border = max(_max, border)
+    
+    return border
+
+
+def compute_jaccard_score(im_1, im_2, angles, center=None):
+    """
+    TO DO
+    """
+    ious = {}
+    
+    for angle in angles:
+        im_tmp = im_2
+        
+        if center is not None:
+            im_tmp = rotate(im_tmp, angle, resize=True, center=center)
+        else:
+            im_tmp = rotate(im_tmp, angle, resize=True)
+        
+        # This is to get the tissue mask inside its bounding box, otherwise
+        # the tissue not centered due to rotation may produce misleading IoU results
+        label_image = label(im_tmp)
+        _, region = max([(region.area, region) for region in regionprops(label_image)], key=lambda x:x[0])
+        minr, minc, maxr, maxc = region.bbox
+        im_tmp = (label_image == region.label)[minr:maxr, minc:maxc]
+        
+        s_max = get_square_border(im_1, im_tmp)
+        
+        binary_1 = np.zeros((s_max, s_max)).astype(np.uint8)
+        binary_2 = np.zeros((s_max, s_max)).astype(np.uint8)
+
+        binary_1[add_padding(im_1, (s_max, s_max), mask=True)==True] = 1
+        binary_2[add_padding(im_tmp, (s_max, s_max), mask=True)==True] = 1
+        
+        ious[f"{angle}"] = jaccard_score(binary_1.flatten(), binary_2.flatten(), pos_label=1)
+    
+    return ious

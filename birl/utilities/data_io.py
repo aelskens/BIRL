@@ -17,6 +17,7 @@ import SimpleITK as sitk
 import yaml
 from PIL import Image
 from skimage.color import gray2rgb, rgb2gray
+import json
 
 #: landmarks coordinates, loading from CSV file
 LANDMARK_COORDS = ['X', 'Y']
@@ -618,7 +619,7 @@ def load_config_args(path_config, comment='#'):
 
 
 def load_config_yaml(path_config):
-    """ loading the
+    """ loading the configuration file content
 
     :param str path_config:
     :return dict:
@@ -642,3 +643,29 @@ def save_config_yaml(path_config, config):
     """
     with open(path_config, 'w') as fp:
         yaml.dump(config, fp, default_flow_style=False)
+
+
+def load_parameters_json(path_params):
+    """ loading the parameters file content
+
+    :param str path_params:
+    :return dict:
+
+    >>> p_params = './testing-params.json'
+    >>> save_params_json(p_params, {'a': 2})
+    >>> load_parameters_json(p_params)
+    {'a': 2}
+    >>> os.remove(p_params)
+    """
+    with open(path_params, 'r') as fp:
+        params = json.load(fp)
+    return params
+
+def save_params_json(path_params, params):
+    """ exporting the parameters as JSON file
+
+    :param str path_params:
+    :param dict params:
+    """
+    with open(path_params, 'w') as fp:
+        json.dump(params, fp)

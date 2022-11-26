@@ -78,17 +78,14 @@ from skimage.filters import threshold_otsu
 from skimage.measure import centroid
 from skimage.io import imsave
 from functools import partial
-from skimage.color import rgb2hsv
-from skimage.filters import gaussian
-from skimage.morphology import closing, square, disk, binary_erosion, opening
 from skimage.measure import label, regionprops
-from scipy import ndimage
+from skimage.transform import rotate
 
 sys.path += [os.path.abspath('.'), os.path.abspath('..')]  # Add path to root
 from birl.benchmark import ImRegBenchmark
-from birl.utilities.data_io import create_folder, save_image, load_image, load_landmarks, save_landmarks, save_landmarks_pts
+from birl.utilities.data_io import create_folder, save_image, load_image, load_landmarks, save_landmarks, save_landmarks_pts, load_parameters_json
 from birl.utilities.experiments import exec_commands, iterate_mproc_map
-from birl.utilities.dataset import REEXP_FOLDER_SCALE
+from birl.utilities.dataset import REEXP_FOLDER_SCALE, get_segmented_tissue, compute_jaccard_score, add_padding
 from bm_experiments import bm_comp_perform
 from bm_dataset.rescale_tissue_images import wrap_scale_image
 
@@ -211,28 +208,14 @@ class LowHighResElastix(ImRegBenchmark):
 
         :param dict item: dictionary with registration params
         :return dict: the same or updated registration info
-        """
-        def __add_padding(im, padding=None):
-            if not padding:
-                return im
-
-            padded = np.zeros(padding)
-
-            x_center = (padding[1] - im.shape[1]) // 2
-            y_center = (padding[0] - im.shape[0]) // 2
-
-            # copy img image into center of result image
-            padded[y_center:y_center+im.shape[0], x_center:x_center+im.shape[1]] = im
-
-            return padded
-                
+        """     
         def __get_mask_images(path_im_mask_name_col, path_dir, percentage=1, padding=None):
             path_im, mask_name, col = path_im_mask_name_col
             percentage = 1.05
 
             path_im_tmp = os.path.join(path_dir, os.path.basename(path_im)) if not padding else os.path.join(path_dir, os.path.basename(path_im)).replace('gray.png', 'not_padded.png')
             im_ref = load_image(path_im_tmp, normalized=False, force_rgb=False)
-            mask = __add_padding(im_ref < percentage*threshold_otsu(im_ref), padding)
+            mask = add_padding(im_ref < percentage*threshold_otsu(im_ref), padding)
             img_name, img_ext = os.path.splitext(os.path.basename(path_im_tmp))
             path_mask = os.path.join(os.path.dirname(path_im_tmp), img_name.replace('_not_padded', '') + f'_{mask_name}' + img_ext)
             imsave(path_mask, mask)
@@ -254,61 +237,6 @@ class LowHighResElastix(ImRegBenchmark):
 
         return item
 
-    def _preregistration(self, item):
-        """
-        TO DO
-        maybe save mask
-        """
-        def get_segmented_tissue(path_im, params):
-            """
-            TO DO
-            """
-            im_S = rgb2hsv(imread(path_im))[:, :, 1] ## load image
-            
-            blur = gaussian(im_S, sigma=0.5, preserve_range=True)
-            
-            threshold = np.percentile(blur, params['threshold'])
-            
-            if params.get('closing', None) is not None:
-                bw = closing(blur > threshold, square(params['closing']))
-            elif params.get('opening', None) is not None:
-                bw = opening(blur > threshold, square(params['opening']))
-            else:
-                bw = (blur > threshold)
-
-            filled = ndimage.binary_fill_holes(bw)
-
-            if params.get('erosion', None) is not None:
-                final = binary_erosion(filled, footprint=disk(params['erosion']))
-            elif params.get('opening', None) is not None:
-                final = opening(filled, disk(params['opening']))
-            else:
-                final = filled
-            
-            return final
-
-        def get_region_information(path_im, params):
-            """
-            TO DO
-            """
-            segmented_tissue = get_segmented_tissue(path_im, params)
-            label_image = label(segmented_tissue)
-            _, region  = max([(region.area, region) for region in regionprops(label_image)], key=lambda x:x[0])
-
-            minr, minc, maxr, maxc = region.bbox
-
-            region_info = {
-                'orientation': region.orientation,
-                'centroid_local': region.centroid_local,
-                'eccentricity': region.eccentricity,
-                'region_bbox_mask': (label_image==region.label)[minr:maxr, minc:maxc]
-            }
-
-            return region_info
-        
-        # do mproc ...
-
-        return
 
     def _low_res_preprocessing(self, item):
         """ generate (if not already present) low resolution images X1
@@ -317,8 +245,6 @@ class LowHighResElastix(ImRegBenchmark):
         :param dict item: dictionary with regist. params
         :return dict: the same or updated registration info
         """
-        logging.debug('.. generate command before registration experiment')
-        # set the paths for this experiment
         path_dir = self._get_path_reg_dir(item)
         path_im_ref, path_im_move, _, _ = self._get_paths(item)
 
@@ -334,37 +260,66 @@ class LowHighResElastix(ImRegBenchmark):
             save_image(path_img_new, img)
             return self._relativize_path(path_img_new, destination='path_exp'), col
 
-        def __add_padding(path_img, padding=None):
-            if not padding:
-                return rgb2gray(load_image(path_img))
+        def estimate_displacement(results, target, moving):
+            results['region_estimated_rotation'] = (results[target]['orientation'] - results[moving]['orientation'])*180/math.pi
 
-            im = rgb2gray(load_image(path_img))
-            padded = np.zeros(padding)
+            angles = [0, 180]
+            if results[target]['eccentricity'] < 0.2 or results[moving]['eccentricity'] < 0.2:
+                angles = [-90, 0, 90, 180]
+            elif abs(results['region_estimated_rotation']) > 10:
+                dual = results['region_estimated_rotation'] + 180 if results['region_estimated_rotation'] + 180  <= 360 else results['region_estimated_rotation'] - 180
+                angles = [results['region_estimated_rotation'], dual]
+            
+            ious = compute_jaccard_score(results[target]['region_bbox_mask'], results[moving]['region_bbox_mask'], angles, center=results[moving]['centroid_local'])
+            max_iou = max(ious, key=ious.get)
+            
+            if ious[max_iou] < 0.75:
+                new_angles = [a for a in [-90, 0, 90, 180] if a not in angles]
+                ious = compute_jaccard_score(results[target]['region_bbox_mask'], results[moving]['region_bbox_mask'], new_angles, center=results[moving]['centroid_local'])
+                max_iou = max(ious, key=ious.get)
 
-            x_center = (padding[1] - im.shape[1]) // 2
-            y_center = (padding[0] - im.shape[0]) // 2
+            results['iou_estimated_rotation'] = float(max_iou) if ious[max_iou] > 0.75 else None
 
-            # copy img image into center of result image
-            padded[y_center:y_center+im.shape[0], x_center:x_center+im.shape[1]] = im
+            # add translation?
 
-            return padded
+            return results
+
+        def get_region_information(path_im, params):
+            segmented_tissue = get_segmented_tissue(load_image(path_im, normalized=False), params)
+            label_image = label(segmented_tissue)
+            _, region  = max([(region.area, region) for region in regionprops(label_image)], key=lambda x:x[0])
+
+            minr, minc, maxr, maxc = region.bbox
+            region_bbox_mask = (label_image==region.label)[minr:maxr, minc:maxc]
+            paht_region_bbox_mask = __path_img(path_im, 'region_bbox_mask')
+            imsave(paht_region_bbox_mask, region_bbox_mask)
+
+            region_info = {
+                'orientation': region.orientation,
+                'centroid': region.centroid,
+                'centroid_local': region.centroid_local,
+                'eccentricity': region.eccentricity,
+                'region_bbox_mask': region_bbox_mask
+            }
+
+            return region_info
 
         def __convert_gray(path_img_col, padding=None):
             path_img, col = path_img_col
             path_img_new = __path_img(path_img, 'gray')
-            __save_img(col, path_img_new, __add_padding(path_img, padding))
+            __save_img(col, path_img_new, add_padding(rgb2gray(load_image(path_img)), padding))
             if padding:
-                __save_img(col, __path_img(path_img, 'not_padded'), __add_padding(path_img))
+                __save_img(col, __path_img(path_img, 'not_padded'), add_padding(rgb2gray(load_image(path_img))))
             return self._relativize_path(path_img_new, destination='path_exp'), col
 
-        def _get_1X_lum_image(path_img_scale_col, padding=None):
+        def _get_1X_region_lum_image(path_img_scale_col, segmentation_params, padding=None):
             path_img, scale, col = path_img_scale_col
             path_img_low_res = re.sub(REEXP_FOLDER_SCALE, f'scale-{scale}pc', path_img).replace('jpg', 'png')
             
             if self.params.get('compute_x1', None) or not os.path.exists(path_img_low_res):
-                wrap_scale_image((path_img, scale), image_ext='.png', overwrite=True)
+                wrap_scale_image(path_img, scale, image_ext='.png', overwrite=True)
 
-            return __convert_gray((path_img_low_res, col), padding)
+            return *__convert_gray((path_img_low_res, col), padding), get_region_information(path_img_low_res, params=segmentation_params)
 
         # Get rescaling percentage
         scale = 100 / item['Full scale magnification']
@@ -372,18 +327,32 @@ class LowHighResElastix(ImRegBenchmark):
             scale = int(scale)
 
         # Get max width and height for the padding
+        pad = False
         h_target, w_target = make_tuple(item["Target image size [pixels]"])
         h_source, w_source = make_tuple(item["Source image size [pixels]"])
-        if (h_target, w_target) != (h_source, w_source):
+        if pad and (h_target, w_target) != (h_source, w_source):
             item['Padding'] = (max([h_target, h_source]), max(w_target, w_source))
         
-        # Fetch or generate low resolution X1 images and convert them into grayscale
+        regions = {}
+
+        # Fetch or generate low resolution X1 images, convert them into grayscale and get tissue region information
         argv_params = [(path_im_ref, scale, self.COL_IMAGE_REF), (path_im_move, scale, self.COL_IMAGE_MOVE)]
-        get_1X_lum_image = partial(_get_1X_lum_image, padding=item.get("Padding", None))
-        for path_img, col in iterate_mproc_map(get_1X_lum_image, argv_params, nb_workers=1, desc=None):
+        params = load_parameters_json(self.params.get('path_segment_params', None))
+        get_1X_lum_image = partial(_get_1X_region_lum_image, segmentation_params=params, padding=item.get("Padding", None))
+        for path_img, col, region_info in iterate_mproc_map(get_1X_lum_image, argv_params, nb_workers=1, desc=None):
             item[col + self.COL_IMAGE_EXT_TEMP] = path_img
+            regions[col] = region_info
 
         self.params['preprocessing'] = ['low_res_gray']
+        
+        regions = estimate_displacement(regions, self.COL_IMAGE_REF, self.COL_IMAGE_MOVE)
+        rotation = regions.get('iou_estimated_rotation', None)
+
+        if rotation:
+            path_img = self._absolute_path(item[self.COL_IMAGE_MOVE + self.COL_IMAGE_EXT_TEMP], destination='expt')
+            save_image(path_img, rotate(load_image(path_img), rotation, resize=True))
+        else:    
+            logging.debug(f'Displacement estimation unsuccessful for {item[self.COL_IMAGE_REF]} and {item[self.COL_IMAGE_MOVE]}')
 
         return item
 
@@ -486,12 +455,7 @@ class LowHighResElastix(ImRegBenchmark):
         if self._ImRegBenchmark__check_exist_regist(idx, path_dir_reg):
             return
         create_folder(path_dir_reg)
-        
-        time_start = time.time()
-        # estimate the rotaion between the two input images
-        row = self._preregistration(row)
-        row[self.COL_TIME_PREREGIST] = (time.time() - time_start) / 60.
-        
+            
         time_start = time.time()
         # do some requested pre-processing if required
         row = self._low_res_preprocessing(row)
@@ -545,6 +509,9 @@ class LowHighResElastix(ImRegBenchmark):
         )
         arg_parser.add_argument(
             '-cfg', '--path_config', required=True, type=str, help='path to the elastic configuration'
+        )
+        arg_parser.add_argument(
+            '-sgm_params', '--path_segment_params', dest='path_segment_params', required=True, type=str, help='path to the parameter set to use for the tissue segmentation'
         )
         arg_parser.add_argument(
             '--compute_x1', dest='compute_x1', action='store_true', help='whether the low resolution images (x1) should explicitly be recomputed'
