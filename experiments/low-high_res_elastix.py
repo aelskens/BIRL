@@ -82,7 +82,7 @@ sys.path += [os.path.abspath('.'), os.path.abspath('..')]  # Add path to root
 from birl.benchmark import ImRegBenchmark
 from birl.utilities.data_io import create_folder, save_image, load_image, load_landmarks, save_landmarks, save_landmarks_pts, load_parameters_json
 from birl.utilities.experiments import exec_commands, iterate_mproc_map
-from birl.utilities.dataset import REEXP_FOLDER_SCALE, get_segmented_tissue, compute_jaccard_score, add_padding
+from birl.utilities.dataset import REEXP_FOLDER_SCALE, get_segmented_tissue, compute_jaccard_score
 from bm_experiments import bm_comp_perform
 from bm_dataset.rescale_tissue_images import wrap_scale_image
 
@@ -206,13 +206,13 @@ class LowHighResElastix(ImRegBenchmark):
         :param dict item: dictionary with registration params
         :return dict: the same or updated registration info
         """     
-        def __get_mask_images(path_im_mask_name_col, path_dir, percentage=1, padding=None):
+        def __get_mask_images(path_im_mask_name_col, path_dir, percentage=1):
             path_im, mask_name, col = path_im_mask_name_col
             percentage = 1.05
 
-            path_im_tmp = os.path.join(path_dir, os.path.basename(path_im)) if not padding else os.path.join(path_dir, os.path.basename(path_im)).replace('gray.png', 'not_padded.png')
+            path_im_tmp = os.path.join(path_dir, os.path.basename(path_im))
             im_ref = load_image(path_im_tmp, normalized=False, force_rgb=False)
-            mask = add_padding(im_ref < percentage*threshold_otsu(im_ref), padding)
+            mask = im_ref < percentage*threshold_otsu(im_ref)
             img_name, img_ext = os.path.splitext(os.path.basename(path_im_tmp))
             path_mask = os.path.join(os.path.dirname(path_im_tmp), img_name.replace('_not_padded', '') + f'_{mask_name}' + img_ext)
             imsave(path_mask, mask)
@@ -225,7 +225,7 @@ class LowHighResElastix(ImRegBenchmark):
                 (item[self.COL_IMAGE_REF + self.COL_IMAGE_EXT_TEMP], "fMask", self.COL_IMAGE_REF + self.COL_IMAGE_EXT_TEMP), 
                 (item[self.COL_IMAGE_MOVE + self.COL_IMAGE_EXT_TEMP], "mMask", self.COL_IMAGE_MOVE + self.COL_IMAGE_EXT_TEMP)
             ]
-            get_mask_images = partial(__get_mask_images, path_dir=self._get_path_reg_dir(item), padding=item.get("Padding", None))
+            get_mask_images = partial(__get_mask_images, path_dir=self._get_path_reg_dir(item))
             for path_img, mask, col in iterate_mproc_map(get_mask_images, argv_params, nb_workers=1, desc=None):
                 if mode == "use_mask":
                     item[mask] = path_img
@@ -270,7 +270,7 @@ class LowHighResElastix(ImRegBenchmark):
             ious = compute_jaccard_score(results[target]['region_bbox_mask'], results[moving]['region_bbox_mask'], angles, center=results[moving]['centroid_local'])
             max_iou = max(ious, key=ious.get)
             
-            if ious[max_iou] < 0.75:
+            if ious[max_iou] < 0.75 and angles != [-90, 0, 90, 180]:
                 new_angles = [a for a in [-90, 0, 90, 180] if a not in angles]
                 ious = compute_jaccard_score(results[target]['region_bbox_mask'], results[moving]['region_bbox_mask'], new_angles, center=results[moving]['centroid_local'])
                 max_iou = max(ious, key=ious.get)
@@ -306,41 +306,33 @@ class LowHighResElastix(ImRegBenchmark):
 
             return region_info
 
-        def __convert_gray(path_img_col, padding=None):
+        def __convert_gray(path_img_col):
             path_img, col = path_img_col
             path_img_new = __path_img(path_img, 'gray')
-            __save_img(col, path_img_new, add_padding(rgb2gray(load_image(path_img)), padding))
-            if padding:
-                __save_img(col, __path_img(path_img, 'not_padded'), add_padding(rgb2gray(load_image(path_img))))
+            __save_img(col, path_img_new, rgb2gray(load_image(path_img)))
+            
             return self._relativize_path(path_img_new, destination='path_exp'), col
 
-        def _get_1X_region_lum_image(path_img_scale_col, segmentation_params, padding=None):
+        def _get_1X_region_lum_image(path_img_scale_col, segmentation_params):
             path_img, scale, col = path_img_scale_col
             path_img_low_res = re.sub(REEXP_FOLDER_SCALE, f'scale-{scale}pc', path_img).replace('jpg', 'png')
             
             if self.params.get('compute_x1', None) or not os.path.exists(path_img_low_res):
                 wrap_scale_image(path_img, scale, image_ext='.png', overwrite=True)
 
-            return *__convert_gray((path_img_low_res, col), padding), get_region_information(path_img_low_res, params=segmentation_params)
+            return *__convert_gray((path_img_low_res, col)), get_region_information(path_img_low_res, params=segmentation_params)
 
         # Get rescaling percentage
         scale = 100 / item['Full scale magnification']
         if int(scale) == scale:
             scale = int(scale)
 
-        # Get max width and height for the padding
-        pad = False
-        h_target, w_target = make_tuple(item["Target image size [pixels]"])
-        h_source, w_source = make_tuple(item["Source image size [pixels]"])
-        if pad and (h_target, w_target) != (h_source, w_source):
-            item['Padding'] = (max([h_target, h_source]), max(w_target, w_source))
-        
         regions = {}
 
         # Fetch or generate low resolution X1 images, convert them into grayscale and get tissue region information
         argv_params = [(path_im_ref, scale, self.COL_IMAGE_REF), (path_im_move, scale, self.COL_IMAGE_MOVE)]
         params = load_parameters_json(self.params.get('path_segment_params', None))
-        get_1X_lum_image = partial(_get_1X_region_lum_image, segmentation_params=params, padding=item.get("Padding", None))
+        get_1X_lum_image = partial(_get_1X_region_lum_image, segmentation_params=params)
         for path_img, col, region_info in iterate_mproc_map(get_1X_lum_image, argv_params, nb_workers=1, desc=None):
             item[col + self.COL_IMAGE_EXT_TEMP] = path_img
             regions[col] = region_info
