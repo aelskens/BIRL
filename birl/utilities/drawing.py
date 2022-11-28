@@ -165,7 +165,7 @@ def overlap_two_images(image1, image2, transparent=0.5):
 
 
 def draw_images_warped_landmarks(
-    image_target, image_source, points_init, points_target, points_warped, fig_size_max=MAX_FIGURE_SIZE
+    image_target=None, image_source=None, points_init=None, points_target=None, points_warped=None, fig_size_max=MAX_FIGURE_SIZE
 ):
     """ composed form several functions - images overlap + landmarks + legend
 
@@ -196,7 +196,7 @@ def draw_images_warped_landmarks(
                                      [points_init, points_target, points_warped])
 
     if image_target is not None and image_source is not None:
-        image = overlap_two_images(image_target, image_source, transparent=0.5)
+        image = overlap_two_images(image_target, image_source, transparent=0.75)
     elif image_target is not None:
         image = image_target
     elif image_source is not None:
