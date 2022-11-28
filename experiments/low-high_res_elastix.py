@@ -63,7 +63,6 @@ Copyright (C) 2017-2019 Jiri Borovec <jiri.borovec@fel.cvut.cz>
 import glob
 import logging
 import os
-import shutil
 import sys
 import re
 import time
@@ -75,11 +74,9 @@ from skimage.color import rgb2gray
 from jinja2 import Template
 from ast import literal_eval as make_tuple
 from skimage.filters import threshold_otsu
-from skimage.measure import centroid
 from skimage.io import imsave
 from functools import partial
 from skimage.measure import label, regionprops
-from skimage.transform import rotate
 
 sys.path += [os.path.abspath('.'), os.path.abspath('..')]  # Add path to root
 from birl.benchmark import ImRegBenchmark
@@ -280,7 +277,12 @@ class LowHighResElastix(ImRegBenchmark):
 
             results['iou_estimated_rotation'] = float(max_iou) if ious[max_iou] > 0.75 else None
 
-            # add translation?
+            y_t, x_t = results[target]['centroid']
+            y_m, x_m = results[moving]['centroid']
+            results['x_translation'] = y_t - y_m
+            results['y_translation'] = x_t - x_m
+
+            results['center'] = (x_m, y_m)
 
             return results
 
@@ -347,12 +349,23 @@ class LowHighResElastix(ImRegBenchmark):
         
         regions = estimate_displacement(regions, self.COL_IMAGE_REF, self.COL_IMAGE_MOVE)
         rotation = regions.get('iou_estimated_rotation', None)
+        x_translation = regions.get('x_translation', None)
+        y_translation = regions.get('y_translation', None)
+        center = regions.get('center', None)
 
-        if rotation:
-            path_img = self._absolute_path(item[self.COL_IMAGE_MOVE + self.COL_IMAGE_EXT_TEMP], destination='expt')
-            save_image(path_img, rotate(load_image(path_img), rotation, resize=True))
-        else:    
-            logging.debug(f'Displacement estimation unsuccessful for {item[self.COL_IMAGE_REF]} and {item[self.COL_IMAGE_MOVE]}')
+        if not rotation or not x_translation or not y_translation or not center:
+            logging.debug(f'Displacement estimation unsuccessful for {item[self.COL_IMAGE_REF]} and {item[self.COL_IMAGE_MOVE]} (rotation = {rotation}, x_translation = {x_translation} and y_translation = {y_translation})')
+        else:
+            path_template = os.path.join(path_dir, 'Initial_estimated_displacement_transformation.txt')
+
+            item[self.COL_INITIAL_TF] = self.write_initial_transform_file(
+                filepath=path_template,
+                trans='\"EulerTransform\"',
+                parameters=[math.radians(float(rotation)), x_translation, y_translation],
+                init_file='NoInitialTransform',
+                size=make_tuple(item['Target image size [pixels]']),
+                center=center
+            )
 
         return item
 
