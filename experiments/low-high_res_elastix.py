@@ -171,7 +171,7 @@ class LowHighResElastix(ImRegBenchmark):
                 image_x=x, 
                 image_y=y, 
                 center_x=center[0], 
-                center_y=center[1]
+                center_y=y-center[1]
             ).dump(filepath)
 
         return filepath
@@ -257,7 +257,7 @@ class LowHighResElastix(ImRegBenchmark):
             save_image(path_img_new, img)
             return self._relativize_path(path_img_new, destination='path_exp'), col
 
-        def estimate_displacement(results, target, moving):
+        def estimate_displacement(results, target, moving, params):
             results['region_estimated_rotation'] = (results[target]['orientation'] - results[moving]['orientation'])*180/math.pi
 
             angles = [0, 180]
@@ -270,19 +270,20 @@ class LowHighResElastix(ImRegBenchmark):
             ious = compute_jaccard_score(results[target]['region_bbox_mask'], results[moving]['region_bbox_mask'], angles, center=results[moving]['centroid_local'])
             max_iou = max(ious, key=ious.get)
             
-            if ious[max_iou] < 0.75 and angles != [-90, 0, 90, 180]:
+            if ious[max_iou] < params['iou_threshold'] and angles != [-90, 0, 90, 180]:
                 new_angles = [a for a in [-90, 0, 90, 180] if a not in angles]
                 ious = compute_jaccard_score(results[target]['region_bbox_mask'], results[moving]['region_bbox_mask'], new_angles, center=results[moving]['centroid_local'])
                 max_iou = max(ious, key=ious.get)
 
-            results['iou_estimated_rotation'] = float(max_iou) if ious[max_iou] > 0.75 else None
+            results['iou_estimated_rotation'] = float(max_iou) if ious[max_iou] >= params['iou_threshold'] else None
 
             y_t, x_t = results[target]['centroid']
             y_m, x_m = results[moving]['centroid']
-            results['x_translation'] = y_t - y_m
-            results['y_translation'] = x_t - x_m
+            results['x_translation'] = x_t - x_m
+            results['y_translation'] = y_t - y_m
 
-            results['center'] = (x_m, y_m)
+            # results['center'] = (x_m, y_m)
+            results['center'] = (x_t, y_t)
 
             return results
 
@@ -339,23 +340,32 @@ class LowHighResElastix(ImRegBenchmark):
 
         self.params['preprocessing'] = ['low_res_gray']
         
-        regions = estimate_displacement(regions, self.COL_IMAGE_REF, self.COL_IMAGE_MOVE)
+        regions = estimate_displacement(regions, self.COL_IMAGE_REF, self.COL_IMAGE_MOVE, params)
         rotation = regions.get('iou_estimated_rotation', None)
         x_translation = regions.get('x_translation', None)
         y_translation = regions.get('y_translation', None)
+        # x_translation = 0.0
+        # y_translation = -10.0
+        y, x = make_tuple(item['Target image size [pixels]'])
         center = regions.get('center', None)
 
         if not rotation or not x_translation or not y_translation or not center:
+        # if not rotation or not center:
             logging.debug(f'Displacement estimation unsuccessful for {item[self.COL_IMAGE_REF]} and {item[self.COL_IMAGE_MOVE]} (rotation = {rotation}, x_translation = {x_translation} and y_translation = {y_translation})')
         else:
+            if abs(rotation) > 90 and abs(rotation) < 180:
+                tmp = x_translation
+                x_translation = y_translation
+                y_translation = -tmp
+
             path_template = os.path.join(path_dir, 'Initial_estimated_displacement_transformation.txt')
 
             item[self.COL_INITIAL_TF] = self.write_initial_transform_file(
                 filepath=path_template,
                 trans='\"EulerTransform\"',
-                parameters=[math.radians(float(rotation)), x_translation, y_translation],
+                parameters=[math.radians(float(rotation)), x_translation, -y_translation],
                 init_file='NoInitialTransform',
-                size=make_tuple(item['Target image size [pixels]']),
+                size=(x, y),
                 center=center
             )
 
@@ -480,13 +490,13 @@ class LowHighResElastix(ImRegBenchmark):
         # compute the registration time in minutes
         row[self.COL_TIME] = (time.time() - time_start) / 60.
         # remove some temporary images
-        row = self._ImRegBenchmark__remove_pproc_images(row)
+        # row = self._ImRegBenchmark__remove_pproc_images(row)
 
         row = self._parse_regist_results(row)
         # if the post-processing failed, return back None
         if not row:
             return
-        row = self._clear_after_registration(row)
+        # row = self._clear_after_registration(row)
 
         if self.params.get('visual', False):
             logging.debug('-> visualise results of experiment: %r', idx)
