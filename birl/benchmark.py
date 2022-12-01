@@ -278,10 +278,16 @@ class ImRegBenchmark(Experiment):
                 path = self._absolute_path(item[col], destination='data')
             return path
 
+        def __path_lnds(col):
+            is_temp = isinstance(item.get(col + self.COL_IMAGE_EXT_TEMP), str)
+            if is_temp:
+                path = self._absolute_path(item[col + self.COL_IMAGE_EXT_TEMP], destination='expt')
+            else:
+                path = self._absolute_path(item[col], destination='data')
+            return path
+
         paths = [__path_img(col) for col in (self.COL_IMAGE_REF, self.COL_IMAGE_MOVE)]
-        paths += [
-            self._absolute_path(item[col], destination='data') for col in (self.COL_POINTS_REF, self.COL_POINTS_MOVE)
-        ]
+        paths += [__path_lnds(col) for col in (self.COL_POINTS_REF, self.COL_POINTS_MOVE)]
         return paths
 
     def _get_path_reg_dir(self, item):

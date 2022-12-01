@@ -118,8 +118,8 @@ class LowHighResElastix(ImRegBenchmark):
     NAME_IMAGE_WARPED = 'result.*'
     #: default name of warped landmarks
     NAME_LNDS_WARPED = 'outputpoints.txt'
-    #: initial transformation file
-    COL_INITIAL_TF = 'Initial TF'
+    #: preregistration transformation file
+    COL_PREREGISTRATION_TF = 'Preregistration TF'
     #: command template for image registration
     COMMAND_REGISTRATION = \
         '%(exec_elastix)s' \
@@ -127,10 +127,12 @@ class LowHighResElastix(ImRegBenchmark):
         ' -m %(source)s' \
         ' -out %(output)s' \
         ' -p %(config)s'
+    #: default transforamtion file
+    TRANSFORMATION_FILE_NAME = 'TransformParameters.0.txt'
     #: command template for image/landmarks transformation
     COMMAND_TRANSFORMATION = \
         '%(exec_transformix)s' \
-        ' -tp %(output)s/TransformParameters.0.txt' \
+        ' -tp %(params)s' \
         ' -out %(output)s' \
         ' -in %(source)s' \
         ' -def %(landmarks)s'
@@ -186,87 +188,49 @@ class LowHighResElastix(ImRegBenchmark):
 
         return filepath
 
-    # def _prepare_img_registration(self, item):
-    #     """ Creating initial transformation file if needed
-
-    #     :param dict item: dictionary with registration params
-    #     :return dict: the same or updated registration info
-    #     """
-    #     angle = item['Initial rotation']
-    #     if angle == 0:
-    #         logging.debug('.. no preparing before registration experiment')
-    #         return item
-        
-    #     # METHOD 1
-    #     # logging.debug('.. creating initial transform file')
-    #     # filepath = os.path.join(self._get_path_reg_dir(item), f'Initial_{angle}_rotation_transformation.txt')
-
-    #     # item[self.COL_INITIAL_TF] = self.write_initial_transform_file(filepath, '\"EulerTransform\"', [math.radians(float(angle)), 0, 0], 'NoInitialTransform', make_tuple(item['Source image size [pixels]']))
-
-    #     # METHOD 2
-    #     # from skimage.transform import rotate
-    #     # path_img = self._absolute_path(item[self.COL_IMAGE_MOVE + self.COL_IMAGE_EXT_TEMP], destination='expt')
-    #     # save_image(path_img, rotate(load_image(path_img), angle, resize=True))
-
-    #     return item
-    
     def _prepare_img_registration(self, item):
-        """ Create tissue masks for both input image and compute the moving image's centroid
+        # """ Create tissue masks for both input image and compute the moving image's centroid
 
-        :param dict item: dictionary with registration params
-        :return dict: the same or updated registration info
-        """     
-        def __get_mask_images(path_im_mask_name_col, path_dir, percentage=1):
-            path_im, mask_name, col = path_im_mask_name_col
-            percentage = 1.05
+        # :param dict item: dictionary with registration params
+        # :return dict: the same or updated registration info
+        # """     
+        # def __get_mask_images(path_im_mask_name_col, path_dir, percentage=1):
+        #     path_im, mask_name, col = path_im_mask_name_col
+        #     percentage = 1.05
 
-            path_im_tmp = os.path.join(path_dir, os.path.basename(path_im))
-            im_ref = load_image(path_im_tmp, normalized=False, force_rgb=False)
-            mask = im_ref < percentage*threshold_otsu(im_ref)
-            img_name, img_ext = os.path.splitext(os.path.basename(path_im_tmp))
-            path_mask = os.path.join(os.path.dirname(path_im_tmp), img_name.replace('_not_padded', '') + f'_{mask_name}' + img_ext)
-            imsave(path_mask, mask)
+        #     path_im_tmp = os.path.join(path_dir, os.path.basename(path_im))
+        #     im_ref = load_image(path_im_tmp, normalized=False, force_rgb=False)
+        #     mask = im_ref < percentage*threshold_otsu(im_ref)
+        #     img_name, img_ext = os.path.splitext(os.path.basename(path_im_tmp))
+        #     path_mask = os.path.join(os.path.dirname(path_im_tmp), img_name.replace('_not_padded', '') + f'_{mask_name}' + img_ext)
+        #     imsave(path_mask, mask)
 
-            return path_mask, mask_name, col
+        #     return path_mask, mask_name, col
 
-        mode = "skip"
-        if mode in ["use_mask", "use_binary"]:
-            argv_params = [
-                (item[self.COL_IMAGE_REF + self.COL_IMAGE_EXT_TEMP], "fMask", self.COL_IMAGE_REF + self.COL_IMAGE_EXT_TEMP), 
-                (item[self.COL_IMAGE_MOVE + self.COL_IMAGE_EXT_TEMP], "mMask", self.COL_IMAGE_MOVE + self.COL_IMAGE_EXT_TEMP)
-            ]
-            get_mask_images = partial(__get_mask_images, path_dir=self._get_path_reg_dir(item))
-            for path_img, mask, col in iterate_mproc_map(get_mask_images, argv_params, nb_workers=1, desc=None):
-                if mode == "use_mask":
-                    item[mask] = path_img
-                else:
-                    item[col] = self._relativize_path(path_img, destination='path_exp')
+        # mode = "skip"
+        # if mode in ["use_mask", "use_binary"]:
+        #     argv_params = [
+        #         (item[self.COL_IMAGE_REF + self.COL_IMAGE_EXT_TEMP], "fMask", self.COL_IMAGE_REF + self.COL_IMAGE_EXT_TEMP), 
+        #         (item[self.COL_IMAGE_MOVE + self.COL_IMAGE_EXT_TEMP], "mMask", self.COL_IMAGE_MOVE + self.COL_IMAGE_EXT_TEMP)
+        #     ]
+        #     get_mask_images = partial(__get_mask_images, path_dir=self._get_path_reg_dir(item))
+        #     for path_img, mask, col in iterate_mproc_map(get_mask_images, argv_params, nb_workers=1, desc=None):
+        #         if mode == "use_mask":
+        #             item[mask] = path_img
+        #         else:
+        #             item[col] = self._relativize_path(path_img, destination='path_exp')
 
         return item
-
-
-    def _low_res_preprocessing(self, item):
-        """ generate (if not already present) low resolution images X1
-        from the inputs and convert them into grayscale
-
-        :param dict item: dictionary with regist. params
-        :return dict: the same or updated registration info
+    
+    def preregistration(self, item, regions, params):
+        """
+        TO DO
         """
         path_dir = self._get_path_reg_dir(item)
-        path_im_ref, path_im_move, _, _ = self._get_paths(item)
 
-        def __path_img(path_img, pproc):
-            img_name, img_ext = os.path.splitext(os.path.basename(path_img))
-            return os.path.join(path_dir, img_name + '_' + pproc + img_ext)
-
-        def __save_img(col, path_img_new, img):
-            col_temp = col + self.COL_IMAGE_EXT_TEMP
-            if isinstance(item.get(col_temp), str):
-                path_img = self._absolute_path(item[col_temp], destination='expt')
-                os.remove(path_img)
-            save_image(path_img_new, img)
-            return self._relativize_path(path_img_new, destination='path_exp'), col
-
+        h_t, w_t = make_tuple(item['Target image size [pixels]'])
+        h_s, w_s = make_tuple(item['Source image size [pixels]'])
+        
         def estimate_displacement(results, target, source, params, target_size, source_size):
             results['region_estimated_rotation'] = (results[target]['orientation'] - results[source]['orientation'])*180/math.pi
 
@@ -299,6 +263,73 @@ class LowHighResElastix(ImRegBenchmark):
 
             return results
 
+        def apply_preregistration_transformation(item):
+            res_paths = self._extract_warped_image_landmarks(item)
+
+            for col in (k for k in res_paths if res_paths[k] is not None):
+                path = res_paths[col]
+                # detect image and landmarks
+                path = self._relativize_path(path, 'path_exp')
+                if os.path.isfile(self._absolute_path(path, destination='expt')):
+                    item[col + self.COL_IMAGE_EXT_TEMP] = path
+
+            del item[self.COL_PREREGISTRATION_TF]
+
+            return item
+
+        regions = estimate_displacement(regions, self.COL_IMAGE_REF, self.COL_IMAGE_MOVE, params, target_size=(h_t, w_t), source_size=(h_s, w_s))
+
+        rotation = regions.get('iou_estimated_rotation', None)
+        x_translation = regions.get('x_translation', None)
+        y_translation = regions.get('y_translation', None)
+        center = regions.get('center', None)
+
+        if not rotation or not x_translation or not y_translation or not center:
+            logging.debug(f'Displacement estimation unsuccessful for {item[self.COL_IMAGE_REF]} and {item[self.COL_IMAGE_MOVE]} (rotation = {rotation}, x_translation = {x_translation} and y_translation = {y_translation})')
+        else:
+            path_template = os.path.join(path_dir, 'Initial_estimated_displacement_transformation.txt')
+
+            item[self.COL_PREREGISTRATION_TF] = self.write_initial_transform_file(
+                filepath=path_template,
+                trans='\"EulerTransform\"',
+                parameters=[math.radians(float(rotation)), x_translation, y_translation],
+                init_file='NoInitialTransform',
+                size=(w_t, h_t),
+                center=center
+            )
+
+            item = apply_preregistration_transformation(item)
+
+        return item
+
+    def _low_res_preprocessing(self, item):
+        """ generate (if not already present) low resolution images X1
+        from the inputs and convert them into grayscale
+
+        :param dict item: dictionary with regist. params
+        :return dict: the same or updated registration info
+        """
+        path_dir = self._get_path_reg_dir(item)
+
+        def __path_img(path_img, pproc):
+            img_name, img_ext = os.path.splitext(os.path.basename(path_img))
+            return os.path.join(path_dir, img_name + '_' + pproc + img_ext)
+
+        def __save_img(col, path_img_new, img):
+            col_temp = col + self.COL_IMAGE_EXT_TEMP
+            if isinstance(item.get(col_temp), str) and item.get(col_temp).startswith(item.get(self.COL_REG_DIR)):
+                path_img = self._absolute_path(item[col_temp], destination='expt')
+                os.remove(path_img)
+            save_image(path_img_new, img)
+            return self._relativize_path(path_img_new, destination='path_exp'), col
+
+        def __convert_gray(path_img_col):
+            path_img, col = path_img_col
+            path_img_new = __path_img(path_img, 'gray')
+            __save_img(col, path_img_new, rgb2gray(load_image(path_img)))
+            
+            return self._relativize_path(path_img_new, destination='path_exp'), col
+
         def get_region_information(path_im, params):
             segmented_tissue = get_segmented_tissue(load_image(path_im, normalized=False), params)
             label_image = label(segmented_tissue)
@@ -319,13 +350,6 @@ class LowHighResElastix(ImRegBenchmark):
 
             return region_info
 
-        def __convert_gray(path_img_col):
-            path_img, col = path_img_col
-            path_img_new = __path_img(path_img, 'gray')
-            __save_img(col, path_img_new, rgb2gray(load_image(path_img)))
-            
-            return self._relativize_path(path_img_new, destination='path_exp'), col
-
         def _get_1X_region_lum_image(path_img_scale_col, segmentation_params):
             path_img, scale, col = path_img_scale_col
             path_img_low_res = re.sub(REEXP_FOLDER_SCALE, f'scale-{scale}pc', path_img).replace('jpg', 'png')
@@ -335,6 +359,8 @@ class LowHighResElastix(ImRegBenchmark):
 
             return *__convert_gray((path_img_low_res, col)), get_region_information(path_img_low_res, params=segmentation_params)
 
+        path_im_ref, path_im_move, _, _ = self._get_paths(item)
+        
         # Get rescaling percentage
         scale = 100 / item['Full scale magnification']
         if int(scale) == scale:
@@ -342,39 +368,18 @@ class LowHighResElastix(ImRegBenchmark):
 
         regions = {}
 
-        # Fetch or generate low resolution X1 images, convert them into grayscale and get tissue region information
+        # Fetch or generate low resolution X1 images, convert them to grayscale and get tissue region information
         argv_params = [(path_im_ref, scale, self.COL_IMAGE_REF), (path_im_move, scale, self.COL_IMAGE_MOVE)]
         params = load_parameters_json(self.params.get('path_segment_params', None))
-        get_1X_lum_image = partial(_get_1X_region_lum_image, segmentation_params=params)
-        for path_img, col, region_info in iterate_mproc_map(get_1X_lum_image, argv_params, nb_workers=1, desc=None):
+        get_1X_region_lum_image = partial(_get_1X_region_lum_image, segmentation_params=params)
+        for path_img, col, region_info in iterate_mproc_map(get_1X_region_lum_image, argv_params, nb_workers=1, desc=None):
             item[col + self.COL_IMAGE_EXT_TEMP] = path_img
             regions[col] = region_info
-
+        
         self.params['preprocessing'] = ['low_res_gray']
         
-        h_t, w_t = make_tuple(item['Target image size [pixels]'])
-        h_s, w_s = make_tuple(item['Source image size [pixels]'])
-
-        regions = estimate_displacement(regions, self.COL_IMAGE_REF, self.COL_IMAGE_MOVE, params, target_size=(h_t, w_t), source_size=(h_s, w_s))
-        rotation = regions.get('iou_estimated_rotation', None)
-        x_translation = regions.get('x_translation', None)
-        y_translation = regions.get('y_translation', None)
-        center = regions.get('center', None)
-
-        if not rotation or not x_translation or not y_translation or not center:
-            logging.debug(f'Displacement estimation unsuccessful for {item[self.COL_IMAGE_REF]} and {item[self.COL_IMAGE_MOVE]} (rotation = {rotation}, x_translation = {x_translation} and y_translation = {y_translation})')
-        else:
-            path_template = os.path.join(path_dir, 'Initial_estimated_displacement_transformation.txt')
-
-            item[self.COL_INITIAL_TF] = self.write_initial_transform_file(
-                filepath=path_template,
-                trans='\"EulerTransform\"',
-                parameters=[math.radians(float(rotation)), x_translation, y_translation],
-                init_file='NoInitialTransform',
-                size=(w_t, h_t),
-                center=center
-            )
-
+        item = self.preregistration(item, regions, params)
+        
         return item
 
     def _generate_regist_command(self, item):
@@ -397,9 +402,9 @@ class LowHighResElastix(ImRegBenchmark):
         if item.get('fMask', None):
             cmd += f' -fMask {item["fMask"]} -mMask {item["mMask"]}'
         
-        init_file = item.get(self.COL_INITIAL_TF, None)
-        if init_file:
-            cmd += f' -t0 {init_file}'
+        # init_file = item.get(self.COL_INITIAL_TF, None)
+        # if init_file:
+        #     cmd += f' -t0 {init_file}'
 
         return cmd
 
@@ -417,12 +422,22 @@ class LowHighResElastix(ImRegBenchmark):
         name_lnds = os.path.basename(path_lnds_ref)
         path_lnds_local = save_landmarks_pts(os.path.join(path_dir, name_lnds), load_landmarks(path_lnds_ref))
 
+        tf_path = os.path.join(path_dir, self.TRANSFORMATION_FILE_NAME)
+        out_col_image = self.COL_IMAGE_MOVE_WARP
+        out_col_lnds = self.COL_POINTS_REF_WARP
+
+        if item.get(self.COL_PREREGISTRATION_TF, None):
+            tf_path = item[self.COL_PREREGISTRATION_TF]
+            out_col_image = self.COL_IMAGE_MOVE
+            out_col_lnds = self.COL_POINTS_REF
+
         # warping the image and points
         cmd = self.COMMAND_TRANSFORMATION % {
             'exec_transformix': self.exec_transformix,
             'source': path_img_move,
             'output': path_dir,
             'landmarks': path_lnds_local,
+            'params': tf_path
         }
         exec_commands(cmd, path_logger=path_log, timeout=self.EXECUTE_TIMEOUT)
 
@@ -442,8 +457,8 @@ class LowHighResElastix(ImRegBenchmark):
             save_landmarks(path_lnds_warp, lnds)
 
         return {
-            self.COL_IMAGE_MOVE_WARP: path_img_warp,
-            self.COL_POINTS_REF_WARP: path_lnds_warp,
+            out_col_image: path_img_warp,
+            out_col_lnds: path_lnds_warp,
         }
 
     def _clear_after_registration(self, item):
