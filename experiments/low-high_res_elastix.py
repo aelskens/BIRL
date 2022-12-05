@@ -267,7 +267,7 @@ class LowHighResElastix(ImRegBenchmark):
             save_image(path_img_new, img)
             return self._relativize_path(path_img_new, destination='path_exp'), col
 
-        def estimate_displacement(results, target, source, params, target_size, source_size):
+        def estimate_displacement(results, target, source, params):
             results['region_estimated_rotation'] = (results[target]['orientation'] - results[source]['orientation'])*180/math.pi
 
             angles = [0, 180]
@@ -287,15 +287,12 @@ class LowHighResElastix(ImRegBenchmark):
 
             results['iou_estimated_rotation'] = float(max_iou) if ious[max_iou] >= params['iou_threshold'] else None
 
-            h_t, _ = target_size
-            h_s, _ = source_size
-
             y_t, x_t = results[target]['centroid']
             y_s, x_s = results[source]['centroid']
-            results['x_translation'] = x_t - x_s
-            results['y_translation'] = -((h_t - y_t) - (h_s - y_s))
+            results['x_translation'] = - (x_t - x_s)
+            results['y_translation'] = - (y_t - y_s)
 
-            results['center'] = (x_s, h_s-y_s)
+            results['center'] = (x_s, y_s)
 
             return results
 
@@ -353,9 +350,8 @@ class LowHighResElastix(ImRegBenchmark):
         self.params['preprocessing'] = ['low_res_gray']
         
         h_t, w_t = make_tuple(item['Target image size [pixels]'])
-        h_s, w_s = make_tuple(item['Source image size [pixels]'])
 
-        regions = estimate_displacement(regions, self.COL_IMAGE_REF, self.COL_IMAGE_MOVE, params, target_size=(h_t, w_t), source_size=(h_s, w_s))
+        regions = estimate_displacement(regions, self.COL_IMAGE_REF, self.COL_IMAGE_MOVE, params)
         rotation = regions.get('iou_estimated_rotation', None)
         x_translation = regions.get('x_translation', None)
         y_translation = regions.get('y_translation', None)
