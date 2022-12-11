@@ -1058,7 +1058,7 @@ def get_segmented_tissue(im, params):
     blur = gaussian(im_S, sigma=0.5, preserve_range=True)
     
     threshold = np.percentile(blur, params['threshold'])
-    
+
     if params.get('closing', None) is not None:
         bw = closing(blur > threshold, square(params['closing']))
     elif params.get('opening', None) is not None:
@@ -1075,7 +1075,7 @@ def get_segmented_tissue(im, params):
     else:
         final = filled
     
-    return final
+    return final, (params['threshold'], threshold)
 
 
 def get_square_border(im_1, im_2):

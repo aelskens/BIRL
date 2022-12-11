@@ -268,6 +268,9 @@ class LowHighResElastix(ImRegBenchmark):
             return self._relativize_path(path_img_new, destination='path_exp'), col
 
         def estimate_displacement(results, target, source, params):
+            if not results.get(target, None):
+                return None
+
             results['region_estimated_rotation'] = (results[target]['orientation'] - results[source]['orientation'])*180/math.pi
 
             angles = [0, 180]
@@ -297,7 +300,10 @@ class LowHighResElastix(ImRegBenchmark):
             return results
 
         def get_region_information(path_im, params):
-            segmented_tissue = get_segmented_tissue(load_image(path_im, normalized=False), params)
+            if os.getenv("PREREGISTRATION", None):
+                return {}, (params['threshold'], None)
+
+            segmented_tissue, threshold = get_segmented_tissue(load_image(path_im, normalized=False), params)
             label_image = label(segmented_tissue)
             _, region  = max([(region.area, region) for region in regionprops(label_image)], key=lambda x:x[0])
 
@@ -314,7 +320,7 @@ class LowHighResElastix(ImRegBenchmark):
                 'region_bbox_mask': region_bbox_mask
             }
 
-            return region_info
+            return region_info, threshold
 
         def __convert_gray(path_img_col):
             path_img, col = path_img_col
@@ -330,7 +336,7 @@ class LowHighResElastix(ImRegBenchmark):
             if self.params.get('compute_x1', None) or not os.path.exists(path_img_low_res):
                 wrap_scale_image(path_img, scale, image_ext='.png', overwrite=True)
 
-            return *__convert_gray((path_img_low_res, col)), get_region_information(path_img_low_res, params=segmentation_params)
+            return *__convert_gray((path_img_low_res, col)), *get_region_information(path_img_low_res, params=segmentation_params)
 
         # Get rescaling percentage
         scale = 100 / item['Full scale magnification']
@@ -342,16 +348,24 @@ class LowHighResElastix(ImRegBenchmark):
         # Fetch or generate low resolution X1 images, convert them into grayscale and get tissue region information
         argv_params = [(path_im_ref, scale, self.COL_IMAGE_REF), (path_im_move, scale, self.COL_IMAGE_MOVE)]
         params = load_parameters_json(self.params.get('path_segment_params', None))
+        if not params['threshold']:
+            os.environ["PREREGISTRATION"] = 'skip'
+
         get_1X_lum_image = partial(_get_1X_region_lum_image, segmentation_params=params)
-        for path_img, col, region_info in iterate_mproc_map(get_1X_lum_image, argv_params, nb_workers=1, desc=None):
+        item[self.COL_PERCENTILE_THRESHOLD] = []
+        for path_img, col, region_info, threshold in iterate_mproc_map(get_1X_lum_image, argv_params, nb_workers=1, desc=None):
             item[col + self.COL_IMAGE_EXT_TEMP] = path_img
             regions[col] = region_info
+            item[self.COL_PERCENTILE_THRESHOLD].append(threshold)
 
         self.params['preprocessing'] = ['low_res_gray']
         
         h_t, w_t = make_tuple(item['Target image size [pixels]'])
 
         regions = estimate_displacement(regions, self.COL_IMAGE_REF, self.COL_IMAGE_MOVE, params)
+        if not regions:
+            return item
+
         rotation = regions.get('iou_estimated_rotation', None)
         x_translation = regions.get('x_translation', None)
         y_translation = regions.get('y_translation', None)
