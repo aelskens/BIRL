@@ -9,8 +9,8 @@ read tissue
 
 if [[ $tissue == "all" ]];
 then
-    low_tissue=("coad" "gastric" "kidney" "lung-lesion" "lung-lobes" "mammary-gland" "mice-kidney")
-    low_tissue2=("10" "2.5" "2.5" "2.5" "10" "10" "5")
+    low_tissue=("breast" "coad" "gastric" "kidney" "lung-lesion" "lung-lobes" "mammary-gland" "mice-kidney")
+    low_tissue2=("2.5" "10" "2.5" "2.5" "2.5" "10" "10" "5")
 else
     low_tissue=("$tissue")
 
