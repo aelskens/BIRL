@@ -322,6 +322,8 @@ def load_image(path_image, normalized=True, force_rgb=True):
     if force_rgb and (image.ndim == 2 or image.shape[2] == 1):
         image = image[:, :, 0] if image.ndim == 3 else image
         image = gray2rgb(image)
+    if image.shape[2] == 4:
+        image = image[..., :3]
     return image.astype(np.float32)
 
 

@@ -120,6 +120,10 @@ class LowHighResElastix(ImRegBenchmark):
     NAME_LNDS_WARPED = 'outputpoints.txt'
     #: initial transformation file
     COL_INITIAL_TF = 'Initial TF'
+    #: Default transformation file
+    TF_FILE = 'TransformParameters.0.txt'
+    #: Name of the preregistration transformation file
+    PREREGISTRATION_TF = 'Initial_estimated_displacement_transformation.txt'
     #: command template for image registration
     COMMAND_REGISTRATION = \
         '%(exec_elastix)s' \
@@ -130,7 +134,7 @@ class LowHighResElastix(ImRegBenchmark):
     #: command template for image/landmarks transformation
     COMMAND_TRANSFORMATION = \
         '%(exec_transformix)s' \
-        ' -tp %(output)s/TransformParameters.0.txt' \
+        ' -tp %(output)s/%(tf)s' \
         ' -out %(output)s' \
         ' -in %(source)s' \
         ' -def %(landmarks)s'
@@ -301,9 +305,9 @@ class LowHighResElastix(ImRegBenchmark):
 
         def get_region_information(path_im, params):
             if os.getenv("PREREGISTRATION", None):
-                return {}, (params['threshold'], None)
+                return {}
 
-            segmented_tissue, threshold = get_segmented_tissue(load_image(path_im, normalized=False), params)
+            segmented_tissue = get_segmented_tissue(load_image(path_im, normalized=False), params)
             label_image = label(segmented_tissue)
             _, region  = max([(region.area, region) for region in regionprops(label_image)], key=lambda x:x[0])
 
@@ -320,7 +324,7 @@ class LowHighResElastix(ImRegBenchmark):
                 'region_bbox_mask': region_bbox_mask
             }
 
-            return region_info, threshold
+            return region_info
 
         def __convert_gray(path_img_col):
             path_img, col = path_img_col
@@ -336,7 +340,7 @@ class LowHighResElastix(ImRegBenchmark):
             if self.params.get('compute_x1', None) or not os.path.exists(path_img_low_res):
                 wrap_scale_image(path_img, scale, image_ext='.png', overwrite=True)
 
-            return *__convert_gray((path_img_low_res, col)), *get_region_information(path_img_low_res, params=segmentation_params)
+            return *__convert_gray((path_img_low_res, col)), get_region_information(path_img_low_res, params=segmentation_params)
 
         # Get rescaling percentage
         scale = 100 / item['Full scale magnification']
@@ -345,18 +349,17 @@ class LowHighResElastix(ImRegBenchmark):
 
         regions = {}
 
-        # Fetch or generate low resolution X1 images, convert them into grayscale and get tissue region information
         argv_params = [(path_im_ref, scale, self.COL_IMAGE_REF), (path_im_move, scale, self.COL_IMAGE_MOVE)]
+        
         params = load_parameters_json(self.params.get('path_segment_params', None))
         if not params['threshold']:
             os.environ["PREREGISTRATION"] = 'skip'
 
+        # Fetch or generate low resolution X1 images, convert them into grayscale and get tissue region information
         get_1X_lum_image = partial(_get_1X_region_lum_image, segmentation_params=params)
-        item[self.COL_PERCENTILE_THRESHOLD] = []
-        for path_img, col, region_info, threshold in iterate_mproc_map(get_1X_lum_image, argv_params, nb_workers=1, desc=None):
+        for path_img, col, region_info in iterate_mproc_map(get_1X_lum_image, argv_params, nb_workers=1, desc=None):
             item[col + self.COL_IMAGE_EXT_TEMP] = path_img
             regions[col] = region_info
-            item[self.COL_PERCENTILE_THRESHOLD].append(threshold)
 
         self.params['preprocessing'] = ['low_res_gray']
         
@@ -374,7 +377,7 @@ class LowHighResElastix(ImRegBenchmark):
         if not rotation or not x_translation or not y_translation or not center:
             logging.debug(f'Displacement estimation unsuccessful for {item[self.COL_IMAGE_REF]} and {item[self.COL_IMAGE_MOVE]} (rotation = {rotation}, x_translation = {x_translation} and y_translation = {y_translation})')
         else:
-            path_template = os.path.join(path_dir, 'Initial_estimated_displacement_transformation.txt')
+            path_template = os.path.join(path_dir, self.PREREGISTRATION_TF)
 
             item[self.COL_INITIAL_TF] = self.write_initial_transform_file(
                 filepath=path_template,
@@ -427,19 +430,24 @@ class LowHighResElastix(ImRegBenchmark):
         name_lnds = os.path.basename(path_lnds_ref)
         path_lnds_local = save_landmarks_pts(os.path.join(path_dir, name_lnds), load_landmarks(path_lnds_ref))
 
+        tf = self.TF_FILE
+        if os.getenv('FIRST_STEP', None) and item.get(self.COL_INITIAL_TF, None):
+            tf = self.PREREGISTRATION_TF
+
         # warping the image and points
         cmd = self.COMMAND_TRANSFORMATION % {
             'exec_transformix': self.exec_transformix,
             'source': path_img_move,
             'output': path_dir,
             'landmarks': path_lnds_local,
+            'tf': tf
         }
         exec_commands(cmd, path_logger=path_log, timeout=self.EXECUTE_TIMEOUT)
 
         # if there is an output image copy it
         path_im_out = glob.glob(os.path.join(path_dir, self.NAME_IMAGE_WARPED))
         if path_im_out:
-            path_im_out = sorted(path_im_out)[0]
+            path_im_out = sorted(path_im_out)[0] if not os.getenv('FIRST_STEP', None) or not item.get(self.COL_INITIAL_TF, None) else sorted(path_im_out)[1]
             _, ext_img = os.path.splitext(path_im_out)
             name_img, _ = os.path.splitext(os.path.basename(path_img_move))
             path_img_warp = os.path.join(path_dir, name_img + ext_img)

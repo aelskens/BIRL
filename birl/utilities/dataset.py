@@ -1075,7 +1075,7 @@ def get_segmented_tissue(im, params):
     else:
         final = filled
     
-    return final, (params['threshold'], threshold)
+    return final
 
 
 def get_square_border(im_1, im_2):

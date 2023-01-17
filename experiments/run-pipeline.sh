@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export DISPLAY=""
+export FIRST_STEP="only"
 # DEFINE GLOBAL PARAMS
 jobs=2
 
@@ -44,20 +44,24 @@ do
     for ps in $parameter_sets
     do
         ps_name=$(basename -- "$ps" .json)
-        mkdir ${results}/${ps_name}
+        if [[ $ps_name != "ps_00" ]];
+        then
 
-        for c in "${configs[@]}"
-        do
+            # mkdir ${results}/${ps_name}
 
-            python experiments/low-high_res_elastix.py \
-                -t $table \
-                -d $dataset \
-                -o ${results}/${ps_name} \
-                -elastix "$apps/elastix/bin" \
-                -cfg "./configs/elastix_${c}_affine.txt" \
-                -sgm_params $ps \
-                --visual --unique --nb_workers $jobs
+            for c in "${configs[@]}"
+            do
 
-        done
+                python experiments/low-high_res_elastix.py \
+                    -t $table \
+                    -d $dataset \
+                    -o ${results}/${ps_name} \
+                    -elastix "$apps/elastix/bin" \
+                    -cfg "./configs/elastix_${c}_affine.txt" \
+                    -sgm_params $ps \
+                    --visual --unique --nb_workers $jobs
+
+            done
+        fi
     done
 done
