@@ -11,7 +11,7 @@ For proper usage of the code, please refer to [BIRL](https://github.com/Borda/BI
 For convenience, a Docker image has been created and can be found on [Docker Hub](). This allows for quick use with a few example image pairs. The command to download the image (if it has not already be done), create a container, and run it in interactive mode is provided.
 
 ```sh
-docker run --rm -v /your/mounted/volume:/output -it aelskens/birl:low_res_prealigned bash
+docker run --rm -v /your/mounted/volume:/outputs -it aelskens/birl:low_res_prealigned bash
 ```
 Please note, the volume argument, */your/mounted/volume*, should be changed by the user and consists of a directory which will be shared with the container in order to recover the outputs.
 
