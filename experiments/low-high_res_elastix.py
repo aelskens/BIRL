@@ -67,6 +67,7 @@ import sys
 import re
 import time
 import math
+import shutil
 
 import numpy as np
 import pandas as pd
@@ -189,30 +190,6 @@ class LowHighResElastix(ImRegBenchmark):
             ).dump(filepath)
 
         return filepath
-
-    # def _prepare_img_registration(self, item):
-    #     """ Creating initial transformation file if needed
-
-    #     :param dict item: dictionary with registration params
-    #     :return dict: the same or updated registration info
-    #     """
-    #     angle = item['Initial rotation']
-    #     if angle == 0:
-    #         logging.debug('.. no preparing before registration experiment')
-    #         return item
-        
-    #     # METHOD 1
-    #     # logging.debug('.. creating initial transform file')
-    #     # filepath = os.path.join(self._get_path_reg_dir(item), f'Initial_{angle}_rotation_transformation.txt')
-
-    #     # item[self.COL_INITIAL_TF] = self.write_initial_transform_file(filepath, '\"EulerTransform\"', [math.radians(float(angle)), 0, 0], 'NoInitialTransform', make_tuple(item['Source image size [pixels]']))
-
-    #     # METHOD 2
-    #     # from skimage.transform import rotate
-    #     # path_img = self._absolute_path(item[self.COL_IMAGE_MOVE + self.COL_IMAGE_EXT_TEMP], destination='expt')
-    #     # save_image(path_img, rotate(load_image(path_img), angle, resize=True))
-
-    #     return item
     
     def _prepare_img_registration(self, item):
         """ Create tissue masks for both input image and compute the moving image's centroid
@@ -339,6 +316,12 @@ class LowHighResElastix(ImRegBenchmark):
             
             if self.params.get('compute_x1', None) or not os.path.exists(path_img_low_res):
                 wrap_scale_image(path_img, scale, image_ext='.png', overwrite=True)
+
+            if os.getenv("HELLOWORLD", None):
+                names = {'Target image': 'fixed', 'Source image': 'moving'}
+                src_path = path_img_low_res
+                dst_path = os.path.join(path_dir, names[col]+".png")
+                shutil.copy(src_path, dst_path)
 
             return *__convert_gray((path_img_low_res, col)), get_region_information(path_img_low_res, params=segmentation_params)
 
