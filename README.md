@@ -18,7 +18,7 @@ Please note, the volume argument, */your/mounted/volume*, should be changed by t
 To use the "hello world" example, the following command should be typed in the container terminal.
 
 ```sh
-./experiments/hello-world_example.sh
+./experiments/hello-world_example/hello-world_example.sh
 ```
 
 The results are available in the directory that has been mounted. The output's structure is the following (with yyyymmdd corresponding to the date and x being a digit):
