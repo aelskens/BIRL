@@ -52,6 +52,7 @@ The results for each pair of images are present in each subfolders (e.g. 0, 1, 2
 * **registration_visual_landmarks.jpg**: the overlay of the fixed and moving images with the initial and estimated landmarks plotted
 * **result.png**: the warped moving image
 * **image_refence-warped.jpg**: the overlay of both warped moving and fixed images.
+
 The quantitative results of the registration are available in **registration-results.csv** and can be found in the example root directory.
 
 ## References
