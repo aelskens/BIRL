@@ -13,5 +13,5 @@ python experiments/low-high_res_elastix.py \
     -o "/outputs" \
     -elastix "$apps/elastix/bin" \
     -cfg "./configs/elastix_LowRes_affine.txt" \
-    -sgm_params "/io/inputs/dataset_ANHIR/segmentation_ps/ps_06.json" \
+    -sgm_params "./experiment/prealignment_ps/best_ps.json" \
     --visual --unique --nb_workers $jobs

@@ -238,11 +238,9 @@ RUN apt-get update -qq --fix-missing && \
 # # try to run RNiftyReg
 #     R -e 'library(RNiftyReg)'
 
-RUN echo 
-
 COPY ./hello_world_data/dataset_ANHIR /io/inputs/dataset_ANHIR/
 
-COPY ./io/BIRL /tmp/BIRL/
+COPY ./io/BIRL /BIRL/
 
 RUN \
     apt-get update -qq && \
@@ -252,13 +250,11 @@ RUN \
 # Install BIRL
     # v46 crashes openslide-python install
     pip install "setuptools<46" -U && \
-    pip install ./tmp/BIRL --no-cache-dir && \
+    pip install ./BIRL --no-cache-dir && \
     python -c "import birl ; print(birl.__version__)" && \
-    # pip install Jinja2 \
 # Cleaning
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/* \
-    rm -r /tmp/BIRL
+    rm -rf /var/lib/apt/lists/*
 
 # RUN \
 #     apt-get update -qq && \
@@ -343,4 +339,4 @@ RUN \
 #     apt-get clean && \
 #     rm -rf /var/lib/apt/lists/*
 
-# WORKDIR /BIRL
+WORKDIR /BIRL
