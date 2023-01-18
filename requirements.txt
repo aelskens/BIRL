@@ -13,3 +13,4 @@ nibabel>=2.1
 SimpleITK
 psutil
 pathos
+Jinja2
