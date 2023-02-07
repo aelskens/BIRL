@@ -53,6 +53,8 @@ The results for each pair of images are present in each subfolders (e.g. 0, 1, 2
 * **result.png**: the warped moving image
 * **image_refence-warped.jpg**: the overlay of both warped moving and fixed images.
 
+The quantitative results of the registration are available in **registration-results.csv** which can be found in the example root directory.
+
 ## References
 Moles Lopez, X., Barbot, P., Van Eycke, Y.-R., Verset, L., Trépant, A.-L., Larbanoix, L., Salmon, I., & Decaestecker, C. (2015).
 Registration of whole immunohistochemical slide images: An efficient way to characterize biomarker colocalization. 
