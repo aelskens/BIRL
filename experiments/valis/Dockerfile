@@ -54,6 +54,7 @@ RUN apt-get update && \
 # Fix certificate issues
 RUN apt-get update && \
     apt-get install ca-certificates-java && \
+    apt-get install -y --no-install-recommends libvips && \
     apt-get clean && \
     update-ca-certificates -f;
 
@@ -62,6 +63,8 @@ ENV JAVA_HOME="/usr/libexec/java_home"
 # Install VALIS
 RUN pip install pyvips && \
     pip install valis-wsi
+    # pip install --upgrade --force-reinstall opencv-contrib-python && \
+    # pip install -U opencv-contrib-python==4.5.2.52
 
 # ENV BIRL_APPs_PATH="/BIRL/Applications"
 
@@ -268,6 +271,9 @@ RUN \
     pip install "setuptools<46" -U && \
     pip install ./tmp/BIRL --no-cache-dir && \
     python -c "import birl ; print(birl.__version__)" && \
+# Fix opencv-contrib-python issue for SIFT and BRISK
+    pip uninstall -y opencv-contrib-python && \
+    pip install -U opencv-contrib-python==4.7.0.68 && \
 # Cleaning
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* \
