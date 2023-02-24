@@ -108,6 +108,7 @@ RUN rm -r vips-${VIPS_VERSION}
 RUN pip install pyvips && \
     pip install valis-wsi
 
+# Install BIRL
 COPY ./ /tmp/BIRL/
 
 RUN \
